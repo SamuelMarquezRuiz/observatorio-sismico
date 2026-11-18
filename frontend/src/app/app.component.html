@@ -1,317 +1,506 @@
 <main>
   <!-- Cabecera del Observatorio -->
-  <header>
-    <p class="eyebrow">BIG DATA · SISTEMAS DISTRIBUIDOS · IABD</p>
-    <h1>Observatorio de Actividad Sísmica</h1>
-    <p class="subtitle">Monitorización en streaming con Apache Kafka, PostgreSQL, FastAPI y Leaflet.</p>
+  <header class="app-header">
+    <div class="header-top">
+      <div class="eyebrow-container">
+        <span class="status-radar" aria-hidden="true">
+          <span class="radar-dot"></span>
+          <span class="radar-wave"></span>
+        </span>
+        <p class="eyebrow">BIG DATA · SISTEMAS DISTRIBUIDOS · IABD</p>
+      </div>
+      <div class="header-actions-pill" aria-hidden="true">
+        <span class="pill-dot"></span>
+        <span class="pill-text">MONITOR EN TIEMPO REAL</span>
+      </div>
+    </div>
+
+    <div class="header-content">
+      <div class="header-text">
+        <h1>Observatorio de Actividad Sísmica</h1>
+        <p class="subtitle">Monitorización en streaming con Apache Kafka, PostgreSQL, FastAPI y Leaflet.</p>
+      </div>
+      <div class="header-graphic" aria-hidden="true">
+        <svg class="seismic-wave-svg" viewBox="0 0 160 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M0 24H40L46 14L54 36L62 6L70 42L78 18L84 28L90 22L96 24H160" stroke="url(#wave-grad)"
+            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+          <defs>
+            <linearGradient id="wave-grad" x1="0" y1="24" x2="160" y2="24" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#0D9488" stop-opacity="0.2" />
+              <stop offset="0.5" stop-color="#38BDF8" />
+              <stop offset="1" stop-color="#0D9488" stop-opacity="0.2" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+    </div>
   </header>
 
   <!-- Banners de Alerta de Estado -->
   @if (!apiConnected()) {
-    <div class="alert alert-danger" role="alert">
+  <div class="alert alert-danger" role="alert">
+    <span class="alert-icon" aria-hidden="true">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
+        <path fill-rule="evenodd"
+          d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+          clip-rule="evenodd" />
+      </svg>
+    </span>
+    <div class="alert-body">
       <strong>⚠️ Desconexión de API / Túnel:</strong> No se pudo conectar con el backend.
-      Se conservan los datos de la última lectura exitosa en caché local. Verifica que Docker y el túnel ngrok estén activos.
+      Se conservan los datos de la última lectura exitosa en caché local. Verifica que Docker y el túnel ngrok estén
+      activos.
     </div>
+  </div>
   }
 
   @if (isReplayMode()) {
-    <div class="alert alert-warning" role="alert">
-      <strong>⚡ MODO REPRODUCCIÓN HISTÓRICA ACTIVO:</strong> Se están reproduciendo sismos históricos por Kafka a velocidad acelerada.
+  <div class="alert alert-warning" role="alert">
+    <span class="alert-icon" aria-hidden="true">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
+        <path fill-rule="evenodd"
+          d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"
+          clip-rule="evenodd" />
+      </svg>
+    </span>
+    <div class="alert-body">
+      <strong>⚡ MODO REPRODUCCIÓN HISTÓRICA ACTIVO:</strong> Se están reproduciendo sismos históricos por Kafka a
+      velocidad acelerada.
       Los datos observados corresponden a demostración de flujo y no representan sismicidad en tiempo real.
     </div>
+  </div>
   }
 
   @if (ingestionAlert() && !isReplayMode()) {
-    <div class="alert alert-info" role="alert">
+  <div class="alert alert-info" role="alert">
+    <span class="alert-icon" aria-hidden="true">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
+        <path fill-rule="evenodd"
+          d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+          clip-rule="evenodd" />
+      </svg>
+    </span>
+    <div class="alert-body">
       <strong>⏱️ Alerta de Ingesta:</strong> La última consulta exitosa a USGS fue hace más de 3 minutos.
       Comprueba el estado del servicio <code>producer</code> en Docker.
     </div>
+  </div>
   }
 
   <!-- Barra de Metadatos y Salud del Sistema -->
   <section class="info-bar" aria-live="polite">
     <div class="info-card">
-      <span class="info-label">Modo Activo</span>
-      <strong class="info-value">{{ mode() }}</strong>
+      <div class="info-card-header">
+        <span class="info-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+            <path fill-rule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
+              clip-rule="evenodd" />
+          </svg>
+        </span>
+        <span class="info-label">Modo Activo</span>
+      </div>
+      <strong class="info-value info-highlight">{{ mode() }}</strong>
     </div>
+
     <div class="info-card">
-      <span class="info-label">Estado de Conexión</span>
-      <span class="info-value" [class.text-danger]="!apiConnected()">{{ status() }}</span>
+      <div class="info-card-header">
+        <span class="info-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+            <path fill-rule="evenodd"
+              d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z"
+              clip-rule="evenodd" />
+          </svg>
+        </span>
+        <span class="info-label">Estado de Conexión</span>
+      </div>
+      <span class="info-value" [class.text-danger]="!apiConnected()">
+        <span class="status-indicator-dot" [class.connected]="apiConnected()" [class.disconnected]="!apiConnected()"
+          aria-hidden="true"></span>
+        {{ status() }}
+      </span>
     </div>
+
     <div class="info-card">
-      <span class="info-label">Eventos Dibujados</span>
-      <strong class="info-value">{{ count() }} <small>({{ omitted() }} descartados)</small></strong>
+      <div class="info-card-header">
+        <span class="info-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+            <path fill-rule="evenodd"
+              d="M12 1.586l-4 4v12.828l4-4V1.586zM3.707 3.293A1 1 0 002 4v10a1 1 0 00.293.707L6 18.414V5.586L3.707 3.293zM17.707 5.293L14 1.586v12.828l2.293 2.293A1 1 0 0018 16V6a1 1 0 00-.293-.707z"
+              clip-rule="evenodd" />
+          </svg>
+        </span>
+        <span class="info-label">Eventos Dibujados</span>
+      </div>
+      <strong class="info-value info-number">{{ count() }} <small class="info-muted">({{ omitted() }}
+          descartados)</small></strong>
     </div>
+
     <div class="info-card">
-      <span class="info-label">Última Ingesta USGS</span>
-      <span class="info-value">{{ lastIngestion() }}</span>
+      <div class="info-card-header">
+        <span class="info-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+            <path fill-rule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+              clip-rule="evenodd" />
+          </svg>
+        </span>
+        <span class="info-label">Última Ingesta USGS</span>
+      </div>
+      <span class="info-value info-mono">{{ lastIngestion() }}</span>
     </div>
+
     <div class="info-card">
-      <span class="info-label">Último Refresco Panel</span>
-      <span class="info-value">{{ lastRead() }}</span>
+      <div class="info-card-header">
+        <span class="info-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+            <path fill-rule="evenodd"
+              d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+              clip-rule="evenodd" />
+          </svg>
+        </span>
+        <span class="info-label">Último Refresco Panel</span>
+      </div>
+      <span class="info-value info-mono">{{ lastRead() }}</span>
     </div>
   </section>
 
   <!-- Panel de Controles y Filtros Interactivos -->
   <section class="filters-panel" aria-label="Controles de filtrado de terremotos">
-    <h2>Filtros de Exploración</h2>
+    <div class="panel-header">
+      <div class="panel-title-group">
+        <span class="panel-title-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
+            <path fill-rule="evenodd"
+              d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
+              clip-rule="evenodd" />
+          </svg>
+        </span>
+        <h2>Filtros de Exploración</h2>
+      </div>
+      <span class="panel-badge">Configuración Activa</span>
+    </div>
+
     <div class="filters-grid">
       <!-- Selector de Modo -->
       <div class="filter-group">
-        <label for="filter-mode">Modo Operativo</label>
-        <select id="filter-mode" [value]="selectedMode()" (change)="onModeChange($event)">
-          <option value="live">🔴 En vivo (Streaming USGS)</option>
-          <option value="replay">⚡ Reproducción Histórica (Replay)</option>
-        </select>
+        <label for="filter-mode">
+          <span class="label-icon" aria-hidden="true">⚡</span>
+          Modo Operativo
+        </label>
+        <div class="select-wrapper">
+          <select id="filter-mode" [value]="selectedMode()" (change)="onModeChange($event)">
+            <option value="live">🔴 En vivo (Streaming USGS)</option>
+            <option value="replay">⚡ Reproducción Histórica (Replay)</option>
+          </select>
+        </div>
       </div>
 
       <!-- Selector de País -->
       <div class="filter-group">
-        <label for="filter-country">Ámbito Geográfico</label>
-        <select id="filter-country" [value]="countryFilter()" (change)="onCountryChange($event)">
-          <option value="">🌍 Todo el mundo</option>
-          <option value="SIN_PAIS">🌊 Sin país asignado (Océano)</option>
-          @for (p of listaPaises(); track p.country_id) {
+        <label for="filter-country">
+          <span class="label-icon" aria-hidden="true">🌍</span>
+          Ámbito Geográfico
+        </label>
+        <div class="select-wrapper">
+          <select id="filter-country" [value]="countryFilter()" (change)="onCountryChange($event)">
+            <option value="">🌍 Todo el mundo</option>
+            <option value="SIN_PAIS">🌊 Sin país asignado (Océano)</option>
+            @for (p of listaPaises(); track p.country_id) {
             <option [value]="p.country_id">{{ p.name }} ({{ p.country_id }})</option>
-          }
-        </select>
+            }
+          </select>
+        </div>
       </div>
 
       <!-- Magnitud Mínima -->
       <div class="filter-group">
-        <label for="filter-mag">Magnitud Mínima (≥)</label>
-        <input 
-          id="filter-mag" 
-          type="number" 
-          step="0.5" 
-          min="0" 
-          max="10" 
-          placeholder="Ej: 4.0" 
-          [value]="minMagFilter()" 
-          (input)="onMinMagInput($event)">
+        <label for="filter-mag">
+          <span class="label-icon" aria-hidden="true">📊</span>
+          Magnitud Mínima (≥)
+        </label>
+        <div class="input-wrapper">
+          <input id="filter-mag" type="number" step="0.5" min="0" max="10" placeholder="Ej: 4.0"
+            [value]="minMagFilter()" (input)="onMinMagInput($event)">
+        </div>
       </div>
 
       <!-- Fecha Inicio -->
       <div class="filter-group">
-        <label for="filter-start">Fecha Inicio UTC</label>
-        <input 
-          id="filter-start" 
-          type="date" 
-          [value]="startDateFilter()" 
-          (change)="onStartDateChange($event)">
+        <label for="filter-start">
+          <span class="label-icon" aria-hidden="true">📅</span>
+          Fecha Inicio UTC
+        </label>
+        <div class="input-wrapper">
+          <input id="filter-start" type="date" [value]="startDateFilter()" (change)="onStartDateChange($event)">
+        </div>
       </div>
 
       <!-- Fecha Fin -->
       <div class="filter-group">
-        <label for="filter-end">Fecha Fin UTC</label>
-        <input 
-          id="filter-end" 
-          type="date" 
-          [value]="endDateFilter()" 
-          (change)="onEndDateChange($event)">
+        <label for="filter-end">
+          <span class="label-icon" aria-hidden="true">📅</span>
+          Fecha Fin UTC
+        </label>
+        <div class="input-wrapper">
+          <input id="filter-end" type="date" [value]="endDateFilter()" (change)="onEndDateChange($event)">
+        </div>
       </div>
 
       <!-- Botones de Acción -->
       <div class="filter-actions">
-        <button type="button" class="btn btn-primary" (click)="applyFilters()">🔍 Aplicar Filtros</button>
-        <button type="button" class="btn btn-secondary" (click)="resetFilters()">↺ Restablecer</button>
+        <button type="button" class="btn btn-primary" (click)="applyFilters()">
+          <span class="btn-icon" aria-hidden="true">🔍</span>
+          Aplicar Filtros
+        </button>
+        <button type="button" class="btn btn-secondary" (click)="resetFilters()">
+          <span class="btn-icon" aria-hidden="true">↺</span>
+          Restablecer
+        </button>
       </div>
     </div>
   </section>
 
   <!-- Mapa Cartográfico Leaflet -->
   <section class="map-container" aria-label="Visualización cartográfica">
-    <div class="map" leaflet [leafletOptions]="options" (leafletMapReady)="onMapReady($event)"></div>
+    <div class="map-frame">
+      <div class="map" leaflet [leafletOptions]="options" (leafletMapReady)="onMapReady($event)"></div>
+    </div>
     <div class="legend" aria-label="Leyenda de profundidad y tamaño">
-      <strong>Leyenda de Profundidad:</strong>
-      <span class="legend-item"><span class="badge depth-shallow"></span> &lt; 70 km (Superficial)</span>
-      <span class="legend-item"><span class="badge depth-intermediate"></span> 70–299 km (Intermedio)</span>
-      <span class="legend-item"><span class="badge depth-deep"></span> ≥ 300 km (Profundo)</span>
-      <span class="legend-item"><span class="badge depth-unknown"></span> No disponible (ND)</span>
+      <div class="legend-header">
+        <span class="legend-title-icon" aria-hidden="true">🎯</span>
+        <strong>Leyenda de Profundidad:</strong>
+      </div>
+      <div class="legend-items-row">
+        <span class="legend-item"><span class="badge depth-shallow"></span> &lt; 70 km (Superficial)</span>
+        <span class="legend-item"><span class="badge depth-intermediate"></span> 70–299 km (Intermedio)</span>
+        <span class="legend-item"><span class="badge depth-deep"></span> ≥ 300 km (Profundo)</span>
+        <span class="legend-item"><span class="badge depth-unknown"></span> No disponible (ND)</span>
+      </div>
       <p class="legend-note">El tamaño del círculo es visualmente proporcional a la magnitud sísmica.</p>
     </div>
   </section>
 
   <!-- Métricas Generales y Comparativa Histórica (FAQ Q23) -->
   @if (estadisticas()) {
-    <section class="metrics-section" aria-label="Resumen de sismicidad y comparación histórica">
-      <div class="metrics-grid">
-        <!-- Tarjeta de Resumen -->
-        <div class="card metric-card">
+  <section class="metrics-section" aria-label="Resumen de sismicidad y comparación histórica">
+    <div class="metrics-grid">
+      <!-- Tarjeta de Resumen -->
+      <div class="card metric-card">
+        <div class="card-header-styled">
+          <span class="card-header-icon" aria-hidden="true">📈</span>
           <h3>Resumen de la Selección</h3>
-          <div class="stats-summary">
-            <div class="stat-item">
-              <span class="stat-number">{{ estadisticas()!.total_eventos }}</span>
-              <span class="stat-desc">Sismos filtrados</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-number">{{ estadisticas()!.resumen_metricas?.mag_media ?? 'ND' }}</span>
-              <span class="stat-desc">Magnitud media</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-number">{{ estadisticas()!.resumen_metricas?.profundidad_media_km ?? 'ND' }} km</span>
-              <span class="stat-desc">Profundidad media</span>
-            </div>
-          </div>
-          <p class="stat-subtext">
-            Magnitudes observadas: Mín <b>{{ estadisticas()!.resumen_metricas?.mag_min ?? 'ND' }}</b> · 
-            Máx <b>{{ estadisticas()!.resumen_metricas?.mag_max ?? 'ND' }}</b> · 
-            Sin magnitud informada: <b>{{ estadisticas()!.resumen_metricas?.total_magnitud_nula ?? 0 }}</b>
-          </p>
         </div>
+        <div class="stats-summary">
+          <div class="stat-item">
+            <span class="stat-number">{{ estadisticas()!.total_eventos }}</span>
+            <span class="stat-desc">Sismos filtrados</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-number">{{ estadisticas()!.resumen_metricas?.mag_media ?? 'ND' }}</span>
+            <span class="stat-desc">Magnitud media</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-number">{{ estadisticas()!.resumen_metricas?.profundidad_media_km ?? 'ND' }} km</span>
+            <span class="stat-desc">Profundidad media</span>
+          </div>
+        </div>
+        <p class="stat-subtext">
+          Magnitudes observadas: Mín <b>{{ estadisticas()!.resumen_metricas?.mag_min ?? 'ND' }}</b> ·
+          Máx <b>{{ estadisticas()!.resumen_metricas?.mag_max ?? 'ND' }}</b> ·
+          Sin magnitud informada: <b>{{ estadisticas()!.resumen_metricas?.total_magnitud_nula ?? 0 }}</b>
+        </p>
+      </div>
 
-        <!-- Tarjeta de Comparativa Histórica 2025 vs 24h -->
-        <div class="card metric-card comparison-card">
+      <!-- Tarjeta de Comparativa Histórica 2025 vs 24h -->
+      <div class="card metric-card comparison-card">
+        <div class="card-header-styled">
+          <span class="card-header-icon" aria-hidden="true">⚖️</span>
           <h3>Comparativa con Histórico 2025</h3>
-          @if (estadisticas()!.comparacion_historica; as comp) {
-            <div class="comparison-values">
-              <div class="comp-box">
-                <span class="comp-val">{{ comp.recuento_reciente_24h }}</span>
-                <span class="comp-lbl">Recuento últimas 24h</span>
-              </div>
-              <div class="comp-divider">vs</div>
-              <div class="comp-box">
-                <span class="comp-val">{{ comp.media_diaria_historica }}</span>
-                <span class="comp-lbl">Media diaria 2025</span>
-              </div>
-              <div class="comp-box comp-variation">
-                <span class="comp-val badge" [class.badge-higher]="comp.diferencia > 0" [class.badge-lower]="comp.diferencia <= 0">
-                  {{ comp.diferencia >= 0 ? '+' : '' }}{{ comp.variacion_porcentual }}%
-                </span>
-                <span class="comp-lbl">Variación</span>
+        </div>
+        @if (estadisticas()!.comparacion_historica; as comp) {
+        <div class="comparison-values">
+          <div class="comp-box">
+            <span class="comp-val">{{ comp.recuento_reciente_24h }}</span>
+            <span class="comp-lbl">Recuento últimas 24h</span>
+          </div>
+          <div class="comp-divider" aria-hidden="true">vs</div>
+          <div class="comp-box">
+            <span class="comp-val">{{ comp.media_diaria_historica }}</span>
+            <span class="comp-lbl">Media diaria 2025</span>
+          </div>
+          <div class="comp-box comp-variation">
+            <span class="comp-val badge" [class.badge-higher]="comp.diferencia > 0"
+              [class.badge-lower]="comp.diferencia <= 0">
+              {{ comp.diferencia >= 0 ? '+' : '' }}{{ comp.variacion_porcentual }}%
+            </span>
+            <span class="comp-lbl">Variación</span>
+          </div>
+        </div>
+        <p class="comparison-explanation">
+          <strong>Conclusión:</strong> {{ comp.interpretacion }}
+        </p>
+        <small class="comparison-note">
+          Filtro base equivalente: Magnitud ≥ 4.0 en el mismo ámbito territorial durante los 365 días de 2025.
+        </small>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- Gráficos de Distribución (Barras semánticas nativas accesibles) -->
+  <section class="charts-section" aria-label="Gráficos de distribución estadística">
+    <div class="section-title-wrap">
+      <h2>Distribuciones y Ventanas Temporales</h2>
+    </div>
+    <div class="charts-grid">
+      <!-- Gráfico de Distribución por Magnitud -->
+      <div class="card chart-card">
+        <div class="card-header-styled">
+          <span class="card-header-icon" aria-hidden="true">📊</span>
+          <h3>Distribución por Magnitud</h3>
+        </div>
+        <div class="bar-chart">
+          @for (entry of estadisticas()!.distribucion_magnitud | keyvalue; track entry.key) {
+          <div class="chart-row">
+            <span class="row-label">{{ entry.key }}</span>
+            <div class="bar-container">
+              <div class="bar bar-mag" [style.width.%]="getPercentage(entry.value, estadisticas()!.total_eventos)">
               </div>
             </div>
-            <p class="comparison-explanation">
-              <strong>Conclusión:</strong> {{ comp.interpretacion }}
-            </p>
-            <small class="comparison-note">
-              Filtro base equivalente: Magnitud ≥ 4.0 en el mismo ámbito territorial durante los 365 días de 2025.
-            </small>
+            <span class="row-value">{{ entry.value }} ({{ getPercentage(entry.value, estadisticas()!.total_eventos)
+              }}%)</span>
+          </div>
           }
         </div>
       </div>
-    </section>
 
-    <!-- Gráficos de Distribución (Barras semánticas nativas accesibles) -->
-    <section class="charts-section" aria-label="Gráficos de distribución estadística">
-      <h2>Distribuciones y Ventanas Temporales</h2>
-      <div class="charts-grid">
-        <!-- Gráfico de Distribución por Magnitud -->
-        <div class="card chart-card">
-          <h3>Distribución por Magnitud</h3>
-          <div class="bar-chart">
-            @for (entry of estadisticas()!.distribucion_magnitud | keyvalue; track entry.key) {
-              <div class="chart-row">
-                <span class="row-label">{{ entry.key }}</span>
-                <div class="bar-container">
-                  <div class="bar bar-mag" [style.width.%]="getPercentage(entry.value, estadisticas()!.total_eventos)"></div>
-                </div>
-                <span class="row-value">{{ entry.value }} ({{ getPercentage(entry.value, estadisticas()!.total_eventos) }}%)</span>
-              </div>
-            }
-          </div>
-        </div>
-
-        <!-- Gráfico de Distribución por Profundidad -->
-        <div class="card chart-card">
+      <!-- Gráfico de Distribución por Profundidad -->
+      <div class="card chart-card">
+        <div class="card-header-styled">
+          <span class="card-header-icon" aria-hidden="true">🧭</span>
           <h3>Distribución por Profundidad</h3>
-          <div class="bar-chart">
-            @for (entry of estadisticas()!.distribucion_profundidad | keyvalue; track entry.key) {
-              <div class="chart-row">
-                <span class="row-label">{{ entry.key }}</span>
-                <div class="bar-container">
-                  <div class="bar bar-depth" [style.width.%]="getPercentage(entry.value, estadisticas()!.total_eventos)"></div>
-                </div>
-                <span class="row-value">{{ entry.value }} ({{ getPercentage(entry.value, estadisticas()!.total_eventos) }}%)</span>
+        </div>
+        <div class="bar-chart">
+          @for (entry of estadisticas()!.distribucion_profundidad | keyvalue; track entry.key) {
+          <div class="chart-row">
+            <span class="row-label">{{ entry.key }}</span>
+            <div class="bar-container">
+              <div class="bar bar-depth" [style.width.%]="getPercentage(entry.value, estadisticas()!.total_eventos)">
               </div>
-            }
+            </div>
+            <span class="row-value">{{ entry.value }} ({{ getPercentage(entry.value, estadisticas()!.total_eventos)
+              }}%)</span>
           </div>
+          }
         </div>
       </div>
+    </div>
 
-      <!-- Actividad por Ventana Fija de 1 Hora UTC -->
-      @if (estadisticas()!.por_ventana_hora.length > 0) {
-        <div class="card window-card">
-          <h3>Actividad por Ventana Fija de 1 Hora UTC</h3>
-          <p class="section-desc">Recuento de terremotos agrupados según el instante físico de ocurrencia (tiempo del evento UTC).</p>
-          <div class="hourly-timeline">
-            @for (w of estadisticas()!.por_ventana_hora; track w.timestamp) {
-              <div class="timeline-bar-col" [title]="w.hora_utc + ': ' + w.count + ' sismos'">
-                <span class="col-count">{{ w.count }}</span>
-                <div class="col-bar" [style.height.px]="Math.min(120, Math.max(12, w.count * 15))"></div>
-                <span class="col-label">{{ formatHour(w.hora_utc) }}</span>
-              </div>
-            }
-          </div>
+    <!-- Actividad por Ventana Fija de 1 Hora UTC -->
+    @if (estadisticas()!.por_ventana_hora.length > 0) {
+    <div class="card window-card">
+      <div class="card-header-styled">
+        <span class="card-header-icon" aria-hidden="true">⏱️</span>
+        <h3>Actividad por Ventana Fija de 1 Hora UTC</h3>
+      </div>
+      <p class="section-desc">Recuento de terremotos agrupados según el instante físico de ocurrencia (tiempo del evento
+        UTC).</p>
+      <div class="hourly-timeline">
+        @for (w of estadisticas()!.por_ventana_hora; track w.timestamp) {
+        <div class="timeline-bar-col" [title]="w.hora_utc + ': ' + w.count + ' sismos'">
+          <span class="col-count">{{ w.count }}</span>
+          <div class="col-bar" [style.height.px]="Math.max(12, (w.count / maxHourlyCount()) * 120)"></div>
+          <span class="col-label">{{ formatHour(w.hora_utc) }}</span>
         </div>
-      }
-    </section>
+        }
+      </div>
+    </div>
+    }
+  </section>
   }
 
   <!-- Tabla Accesible de Eventos (Alternativa al Mapa y al Color) -->
   <section class="table-section" aria-label="Tabla de datos accesibles">
     <div class="table-header">
-      <h2>Listado de Terremotos (Tabla Accesible)</h2>
+      <div class="table-title-group">
+        <span class="table-title-icon" aria-hidden="true">📋</span>
+        <h2>Listado de Terremotos (Tabla Accesible)</h2>
+      </div>
       <p>Alternativa textual y accesible para usuarios con lectores de pantalla o navegación por teclado.</p>
     </div>
 
     @if (eventosList().length === 0) {
+    <div class="empty-state-box">
+      <span class="empty-icon" aria-hidden="true">🔍</span>
       <p class="empty-state">No hay eventos para mostrar con los filtros seleccionados.</p>
+    </div>
     } @else {
-      <div class="table-responsive">
-        <table class="earthquake-table" aria-label="Terremotos seleccionados">
-          <thead>
-            <tr>
-              <th scope="col">Fecha / Hora (UTC)</th>
-              <th scope="col">Magnitud</th>
-              <th scope="col">Profundidad</th>
-              <th scope="col">Ubicación / Descripción</th>
-              <th scope="col">País</th>
-              <th scope="col">Coordenadas</th>
-              <th scope="col">Identificador</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (ev of paginatedEvents(); track ev.id) {
-              <tr>
-                <td>{{ formatDate(ev.properties.time) }}</td>
-                <td>
-                  <strong>{{ ev.properties.mag !== null ? ev.properties.mag.toFixed(1) : 'ND' }}</strong>
-                  <small>{{ ev.properties.magType ?? '' }}</small>
-                </td>
-                <td>
-                  {{ ev.geometry.coordinates[2] !== undefined && ev.geometry.coordinates[2] !== null ? ev.geometry.coordinates[2] + ' km' : 'ND' }}
-                </td>
-                <td>{{ ev.properties.place ?? 'Sin descripción' }}</td>
-                <td>
-                  <span class="country-badge" [class.maritime]="!ev.properties.country_id">
-                    {{ ev.properties.country_name ?? 'Sin país asignado' }}
-                  </span>
-                </td>
-                <td>
-                  <code>{{ ev.geometry.coordinates[1].toFixed(3) }}°, {{ ev.geometry.coordinates[0].toFixed(3) }}°</code>
-                </td>
-                <td><code>{{ ev.id }}</code></td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
+    <div class="table-responsive">
+      <table class="earthquake-table" aria-label="Terremotos seleccionados">
+        <thead>
+          <tr>
+            <th scope="col">Fecha / Hora (UTC)</th>
+            <th scope="col">Magnitud</th>
+            <th scope="col">Profundidad</th>
+            <th scope="col">Ubicación / Descripción</th>
+            <th scope="col">País</th>
+            <th scope="col">Coordenadas</th>
+            <th scope="col">Identificador</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (ev of paginatedEvents(); track ev.id) {
+          <tr>
+            <td class="col-date">{{ formatDate(ev.properties.time) }}</td>
+            <td class="col-mag">
+              <span class="mag-pill" [class.mag-strong]="ev.properties.mag !== null && ev.properties.mag >= 5.0">
+                <strong>{{ ev.properties.mag !== null ? ev.properties.mag.toFixed(1) : 'ND' }}</strong>
+                <small class="mag-type">{{ ev.properties.magType ?? '' }}</small>
+              </span>
+            </td>
+            <td class="col-depth">
+              <span class="depth-text">{{ ev.geometry.coordinates[2] !== undefined && ev.geometry.coordinates[2] !==
+                null ? ev.geometry.coordinates[2] + ' km' : 'ND' }}</span>
+            </td>
+            <td class="col-place">{{ ev.properties.place ?? 'Sin descripción' }}</td>
+            <td class="col-country">
+              <span class="country-badge" [class.maritime]="!ev.properties.country_id">
+                {{ ev.properties.country_name ?? 'Sin país asignado' }}
+              </span>
+            </td>
+            <td class="col-coords">
+              <code
+                class="coord-chip">{{ ev.geometry.coordinates[1].toFixed(3) }}°, {{ ev.geometry.coordinates[0].toFixed(3) }}°</code>
+            </td>
+            <td class="col-id">
+              <code class="id-chip">{{ ev.id }}</code>
+            </td>
+          </tr>
+          }
+        </tbody>
+      </table>
+    </div>
 
-      <!-- Controles de Paginación -->
-      <nav class="pagination" aria-label="Navegación de páginas de la tabla">
-        <button type="button" class="btn btn-sm" [disabled]="currentPage() === 1" (click)="prevPage()">← Anterior</button>
-        <span class="page-indicator">Página {{ currentPage() }} de {{ totalPages() }} ({{ eventosList().length }} terremotos)</span>
-        <button type="button" class="btn btn-sm" [disabled]="currentPage() >= totalPages()" (click)="nextPage()">Siguiente →</button>
-      </nav>
+    <!-- Controles de Paginación -->
+    <nav class="pagination" aria-label="Navegación de páginas de la tabla">
+      <button type="button" class="btn btn-sm btn-nav" [disabled]="currentPage() === 1" (click)="prevPage()">←
+        Anterior</button>
+      <span class="page-indicator">Página {{ currentPage() }} de {{ totalPages() }} ({{ eventosList().length }}
+        terremotos)</span>
+      <button type="button" class="btn btn-sm btn-nav" [disabled]="currentPage() >= totalPages()"
+        (click)="nextPage()">Siguiente →</button>
+    </nav>
     }
   </section>
 
   <!-- Pie de Página -->
-  <footer>
+  <footer class="app-footer">
     <div class="footer-content">
-      <p><strong>Observatorio de Actividad Sísmica</strong> · Proyecto de Big Data y Sistemas Distribuidos.</p>
-      <p class="footer-sources">Fuentes oficiales: Catálogo FDSNWS y Feed de USGS · Cartografía: Natural Earth 1:110m · Teselas: OpenStreetMap.</p>
+      <p class="footer-title"><strong>Observatorio de Actividad Sísmica</strong> · Proyecto de Big Data y Sistemas
+        Distribuidos.</p>
+      <p class="footer-sources">Fuentes oficiales: Catálogo FDSNWS y Feed de USGS · Cartografía: Natural Earth 1:110m ·
+        Teselas: OpenStreetMap.</p>
     </div>
   </footer>
 </main>

@@ -144,6 +144,12 @@ export class AppComponent implements OnDestroy {
     return this.eventosList().slice(start, start + size);
   });
 
+  readonly maxHourlyCount = computed(() => {
+    const windows = this.estadisticas()?.por_ventana_hora ?? [];
+    if (windows.length === 0) return 1;
+    return Math.max(1, ...windows.map(w => w.count));
+  });
+
   // Configuración de mapa
   readonly options: L.MapOptions = {
     center: L.latLng(18, 0),

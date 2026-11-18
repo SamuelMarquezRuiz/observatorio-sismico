@@ -1,1 +1,67 @@
-body { margin: 0; background: #eef3f6; color: #132b40; font-family: system-ui, sans-serif; } * { box-sizing: border-box; } .leaflet-popup-content { white-space: pre-line; }
+/* Estilos Globales - Observatorio Sísmico */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #0b0f19;
+  color: #f1f5f9;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar global personalizado */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0b0f19;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 5px;
+  border: 2px solid #0b0f19;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* Adaptación de popups de Leaflet al tema oscuro sin alterar capas cartográficas */
+.leaflet-popup-content-wrapper {
+  background: #131b2e !important;
+  color: #f1f5f9 !important;
+  border: 1px solid #1e293b !important;
+  border-radius: 10px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6) !important;
+}
+
+.leaflet-popup-tip {
+  background: #131b2e !important;
+  border: 1px solid #1e293b !important;
+}
+
+.leaflet-popup-content {
+  white-space: pre-line;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #f1f5f9;
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+  color: #94a3b8 !important;
+}
+
+.leaflet-container a.leaflet-popup-close-button:hover {
+  color: #f1f5f9 !important;
+}
