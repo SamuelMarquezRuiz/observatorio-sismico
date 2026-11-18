@@ -67,6 +67,25 @@ def startup_event():
         logger.error(f"PostgreSQL no accesible durante startup: {e}")
 
 # =============================================================================
+# 0. GET /
+# =============================================================================
+@app.get("/")
+def get_root():
+    """
+    Ruta raíz informativa para verificar que la API y el túnel ngrok funcionan.
+    """
+    return {
+        "servicio": "Observatorio de Actividad Sísmica - API REST",
+        "estado": "operativo",
+        "version": "1.0.0",
+        "documentacion": "/docs",
+        "salud": "/api/salud",
+        "eventos": "/api/eventos",
+        "estadisticas": "/api/estadisticas",
+        "paises": "/api/paises"
+    }
+
+# =============================================================================
 # 1. GET /api/salud
 # =============================================================================
 @app.get("/api/salud")
