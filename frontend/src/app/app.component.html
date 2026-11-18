@@ -161,7 +161,16 @@
         </span>
         <span class="info-label">Último Refresco Panel</span>
       </div>
-      <span class="info-value info-mono">{{ lastRead() }}</span>
+      <div class="refresh-row">
+        <span class="info-value info-mono">{{ lastRead() }}</span>
+        @if (selectedMode() !== 'historical') {
+        <label class="autorefresh-toggle" title="Activar o desactivar el refresco automático cada 60 segundos">
+          <input type="checkbox" [checked]="autoRefreshEnabled()" (change)="toggleAutoRefresh()">
+          <span class="toggle-slider"></span>
+          <span class="toggle-text">Auto (60s)</span>
+        </label>
+        }
+      </div>
     </div>
   </section>
 
@@ -192,6 +201,7 @@
           <select id="filter-mode" [value]="selectedMode()" (change)="onModeChange($event)">
             <option value="live">🔴 En vivo (Streaming USGS)</option>
             <option value="replay">⚡ Reproducción Histórica (Replay)</option>
+            <option value="historical">📚 Catálogo Histórico 2025 (18.302 sismos)</option>
           </select>
         </div>
       </div>
@@ -262,7 +272,7 @@
   </section>
 
   <!-- Mapa Cartográfico Leaflet -->
-  <section class="map-container" aria-label="Visualización cartográfica">
+  <section id="map-section" class="map-container" aria-label="Visualización cartográfica">
     <div class="map-frame">
       <div class="map" leaflet [leafletOptions]="options" (leafletMapReady)="onMapReady($event)"></div>
     </div>
@@ -345,6 +355,58 @@
         </small>
         }
       </div>
+
+      <!-- Tarjeta Evento Destacado (Mayor Magnitud) -->
+      @if (featuredEvent(); as feat) {
+      <div class="card metric-card featured-card">
+        <div class="featured-header-row">
+          <div class="card-header-styled">
+            <span class="card-header-icon" aria-hidden="true">🌋</span>
+            <h3>Evento Destacado</h3>
+          </div>
+          <span class="featured-mag-badge">M {{ feat.properties.mag !== null ? feat.properties.mag.toFixed(1) : 'ND' }}</span>
+        </div>
+        <p class="featured-place">{{ feat.properties.place ?? 'Ubicación sin especificar' }}</p>
+        <div class="featured-details-grid">
+          <div class="feat-detail">
+            <span class="feat-lbl">Profundidad</span>
+            <span class="feat-val">{{ feat.geometry.coordinates[2] !== undefined && feat.geometry.coordinates[2] !== null ? feat.geometry.coordinates[2] + ' km' : 'ND' }}</span>
+          </div>
+          <div class="feat-detail">
+            <span class="feat-lbl">País / Región</span>
+            <span class="feat-val">{{ feat.properties.country_name ?? 'Sin país asignado' }}</span>
+          </div>
+          <div class="feat-detail">
+            <span class="feat-lbl">Fecha UTC</span>
+            <span class="feat-val feat-mono">{{ formatDate(feat.properties.time) }}</span>
+          </div>
+        </div>
+        <button type="button" class="btn btn-locate-featured" (click)="focusOnEvent(feat)">
+          <span aria-hidden="true">🎯</span> Localizar en el mapa
+        </button>
+      </div>
+      }
+
+      <!-- Tarjeta Top 5 Regiones / Países -->
+      @if (topRegions().length > 0) {
+      <div class="card metric-card top-regions-card">
+        <div class="card-header-styled">
+          <span class="card-header-icon" aria-hidden="true">🏆</span>
+          <h3>Top 5 Regiones / Países</h3>
+        </div>
+        <div class="bar-chart compact-bars">
+          @for (reg of topRegions(); track reg.name) {
+          <div class="chart-row">
+            <span class="row-label" [title]="reg.name">{{ reg.name }}</span>
+            <div class="bar-container">
+              <div class="bar bar-region" [style.width.%]="getPercentage(reg.count, eventosList().length)"></div>
+            </div>
+            <span class="row-value">{{ reg.count }} ({{ getPercentage(reg.count, eventosList().length) }}%)</span>
+          </div>
+          }
+        </div>
+      </div>
+      }
     </div>
   </section>
 
@@ -397,24 +459,57 @@
       </div>
     </div>
 
-    <!-- Actividad por Ventana Fija de 1 Hora UTC -->
+    <!-- Actividad por Ventana Temporal UTC -->
     @if (estadisticas()!.por_ventana_hora.length > 0) {
     <div class="card window-card">
-      <div class="card-header-styled">
-        <span class="card-header-icon" aria-hidden="true">⏱️</span>
-        <h3>Actividad por Ventana Fija de 1 Hora UTC</h3>
+      <div class="window-card-header">
+        <div class="card-header-styled">
+          <span class="card-header-icon" aria-hidden="true">⏱️</span>
+          <h3>Actividad por Ventana {{ isDailyChartMode() ? 'Diaria UTC' : 'Fija de 1 Hora UTC' }}</h3>
+        </div>
+        @if (isDailyChartMode() && availableMonths().length > 0) {
+        <div class="chart-month-controls">
+          <span class="month-total-badge">{{ monthlyTotalEvents() }} sismos</span>
+          <label for="chart-month-select" class="sr-only">Seleccionar mes</label>
+          <select id="chart-month-select" class="chart-month-select" [value]="activeChartMonth()"
+            (change)="onChartMonthChange($event)">
+            @for (m of availableMonths(); track m.value) {
+            <option [value]="m.value">{{ m.label }}</option>
+            }
+          </select>
+        </div>
+        }
       </div>
-      <p class="section-desc">Recuento de terremotos agrupados según el instante físico de ocurrencia (tiempo del evento
-        UTC).</p>
+      <p class="section-desc">
+        @if (isDailyChartMode()) {
+        Desglose diario completo del mes seleccionado en UTC (días sin actividad mostrados con 0).
+        } @else {
+        Recuento de terremotos agrupados según el instante físico de ocurrencia (tiempo del evento UTC).
+        }
+      </p>
+
+      @if (isDailyChartMode()) {
+      <div class="daily-timeline" aria-label="Desglose diario de terremotos del mes seleccionado">
+        @for (d of dailyChartData(); track d.date) {
+        <div class="daily-bar-col" [title]="d.date + ' UTC: ' + d.count + ' sismos'">
+          <span class="col-count daily-count" [class.zero-count]="d.count === 0">{{ d.count }}</span>
+          <div class="col-bar daily-bar" [class.zero-bar]="d.count === 0"
+            [style.height.px]="d.count === 0 ? 3 : Math.max(10, (d.count / maxDailyCount()) * 135)"></div>
+          <span class="col-label daily-label">{{ d.dayLabel }}</span>
+        </div>
+        }
+      </div>
+      } @else {
       <div class="hourly-timeline">
         @for (w of estadisticas()!.por_ventana_hora; track w.timestamp) {
         <div class="timeline-bar-col" [title]="w.hora_utc + ': ' + w.count + ' sismos'">
           <span class="col-count">{{ w.count }}</span>
           <div class="col-bar" [style.height.px]="Math.max(12, (w.count / maxHourlyCount()) * 120)"></div>
-          <span class="col-label">{{ formatHour(w.hora_utc) }}</span>
+          <span class="col-label">{{ formatWindowLabel(w.hora_utc, estadisticas()!.metadata?.temporal_granularity) }}</span>
         </div>
         }
       </div>
+      }
     </div>
     }
   </section>
@@ -422,12 +517,17 @@
 
   <!-- Tabla Accesible de Eventos (Alternativa al Mapa y al Color) -->
   <section class="table-section" aria-label="Tabla de datos accesibles">
-    <div class="table-header">
-      <div class="table-title-group">
-        <span class="table-title-icon" aria-hidden="true">📋</span>
-        <h2>Listado de Terremotos (Tabla Accesible)</h2>
+    <div class="table-header-row">
+      <div class="table-header">
+        <div class="table-title-group">
+          <span class="table-title-icon" aria-hidden="true">📋</span>
+          <h2>Listado de Terremotos (Tabla Accesible)</h2>
+        </div>
+        <p>Alternativa textual y accesible. Haz clic en cualquier fila para localizar el sismo en el mapa.</p>
       </div>
-      <p>Alternativa textual y accesible para usuarios con lectores de pantalla o navegación por teclado.</p>
+      <button type="button" class="btn btn-export" (click)="exportCsv()" [disabled]="eventosList().length === 0">
+        <span aria-hidden="true">📥</span> Exportar CSV
+      </button>
     </div>
 
     @if (eventosList().length === 0) {
@@ -447,12 +547,18 @@
             <th scope="col">País</th>
             <th scope="col">Coordenadas</th>
             <th scope="col">Identificador</th>
+            <th scope="col">Acción</th>
           </tr>
         </thead>
         <tbody>
           @for (ev of paginatedEvents(); track ev.id) {
-          <tr>
-            <td class="col-date">{{ formatDate(ev.properties.time) }}</td>
+          <tr class="clickable-row" (click)="focusOnEvent(ev)">
+            <td class="col-date">
+              {{ formatDate(ev.properties.time) }}
+              @if (newEventIds().has(ev.id)) {
+              <span class="new-badge">NUEVO</span>
+              }
+            </td>
             <td class="col-mag">
               <span class="mag-pill" [class.mag-strong]="ev.properties.mag !== null && ev.properties.mag >= 5.0">
                 <strong>{{ ev.properties.mag !== null ? ev.properties.mag.toFixed(1) : 'ND' }}</strong>
@@ -475,6 +581,12 @@
             </td>
             <td class="col-id">
               <code class="id-chip">{{ ev.id }}</code>
+            </td>
+            <td class="col-action">
+              <button type="button" class="btn-locate" title="Localizar en el mapa"
+                (click)="focusOnEvent(ev); $event.stopPropagation()">
+                🎯 Ver
+              </button>
             </td>
           </tr>
           }

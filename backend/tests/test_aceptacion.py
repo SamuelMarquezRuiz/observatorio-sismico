@@ -26,19 +26,20 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+import os
 import psycopg2
 from psycopg2.extras import Json, RealDictCursor
 from aiokafka import AIOKafkaProducer
 
-# ── Config ──
-PG_HOST   = "localhost"
-PG_PORT   = 5432
-PG_DB     = "observatorio"
-PG_USER   = "observatorio"
-PG_PASS   = "observatorio_secret_pw"
-KAFKA_BS  = "localhost:29092"
-TOPIC     = "terremotos.live"
-TOPIC_REPLAY = "terremotos.replay"
+# ── Config (compatible tanto en host local como dentro de Docker) ──
+PG_HOST   = os.getenv("POSTGRES_HOST", "localhost")
+PG_PORT   = int(os.getenv("POSTGRES_PORT", "5432"))
+PG_DB     = os.getenv("POSTGRES_DB", "observatorio")
+PG_USER   = os.getenv("POSTGRES_USER", "observatorio")
+PG_PASS   = os.getenv("POSTGRES_PASSWORD", "observatorio_secret_pw")
+KAFKA_BS  = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:29092")
+TOPIC     = os.getenv("KAFKA_TOPIC", "terremotos.live")
+TOPIC_REPLAY = os.getenv("KAFKA_REPLAY_TOPIC", "terremotos.replay")
 
 
 def pg_conn():
@@ -72,8 +73,28 @@ def query_scalar(sql, params=None):
     return list(r.values())[0] if r else None
 
 
-async def send_kafka(topic, event_id, event_dict, mode="live"):
-    """Envía un mensaje por Kafka y espera ACK."""
+API_URL = os.getenv("API_URL", "http://localhost:8000").rstrip("/")
+
+
+def api_evento(event_id, mode="test"):
+    """Consulta la API real y devuelve la Feature del evento (o None). Demuestra 'visible en API'."""
+    import httpx
+    try:
+        r = httpx.get(f"{API_URL}/api/eventos", params={"mode": mode, "start": "2000-01-01T00:00:00Z"}, timeout=15)
+        for f in r.json().get("features", []):
+            if f["id"] == event_id:
+                return f
+    except Exception as e:
+        print(f"  ! API no accesible: {e}")
+    return None
+
+
+async def send_kafka(topic, event_id, event_dict, mode="test"):
+    """
+    Envía un mensaje por Kafka y espera ACK.
+    Los casos artificiales se etiquetan mode='test' para que queden SEPARADOS e IDENTIFICADOS
+    (ENUNCIADO §6): la API filtra por modo, así que nunca se mezclan con 'live' ni 'historical'.
+    """
     producer = AIOKafkaProducer(bootstrap_servers=KAFKA_BS)
     await producer.start()
     msg = {
@@ -177,7 +198,9 @@ def test_01_evento_nuevo():
     if row:
         print(f"  → mag={row['mag']}, place='{row['place']}', country_id={row['country_id']}")
     print(f"  → Versiones registradas:   {ver}")
-    ok = found and row and float(row['mag']) == 5.2
+    api_feat = api_evento(eid)
+    print(f"  → Visible en API (/api/eventos?mode=test): {'SÍ' if api_feat else 'NO'}")
+    ok = found and row and float(row['mag']) == 5.2 and api_feat is not None
     print(f"  ✅ RESULTADO: {'PASA' if ok else 'FALLA'}")
     return ok, eid, now_ms
 
@@ -237,7 +260,10 @@ def test_03_version_posterior(eid, updated_ms):
         print(f"  → evento_actual.mag:       {row['mag']}")
         print(f"  → evento_actual.depth_km:  {row['depth_km']}")
         print(f"  → Versiones totales:       {versions}")
-        ok = float(row['mag']) == 5.8 and float(row['depth_km']) == 18.0
+        api_feat = api_evento(eid)
+        api_mag = api_feat["properties"]["mag"] if api_feat else None
+        print(f"  → mag servida por la API:  {api_mag} (la agregación se recalcula desde evento_actual)")
+        ok = float(row['mag']) == 5.8 and float(row['depth_km']) == 18.0 and api_mag == 5.8
     else:
         ok = False
     print(f"  ✅ RESULTADO: {'PASA' if ok else 'FALLA'}")
@@ -371,23 +397,17 @@ def test_07_evento_maritimo():
 # PRUEBA 8: Reiniciar consumidor sin duplicar efectos
 # ===========================================================================
 def test_08_reinicio_consumidor():
+    """
+    Esta prueba necesita parar/arrancar contenedores (docker), algo imposible desde dentro del
+    contenedor. Se automatiza desde el host con scripts/prueba_08_reinicio_consumidor.ps1.
+    Aquí NO se da por superada: se devuelve None (= MANUAL) para no inflar el resultado.
+    """
     print("\n" + "="*70)
     print("PRUEBA 8: Reiniciar consumidor sin duplicar efectos")
     print("="*70)
-    print("  (Esta prueba se ejecuta manualmente con 'docker restart')")
-    print("  → Capturamos estado PRE-reinicio...")
-
-    count_before = query_scalar("SELECT COUNT(*) FROM evento_actual")
-    version_before = query_scalar("SELECT COUNT(*) FROM evento_version")
-
-    print(f"  → evento_actual antes:  {count_before}")
-    print(f"  → evento_version antes: {version_before}")
-    print("  → Registrar estos valores. Luego ejecutar:")
-    print("      docker restart observatorio-consumer")
-    print("    y esperar 30s. Los recuentos NO deben aumentar si no hay")
-    print("    nuevos mensajes en Kafka.")
-
-    return True  # Registramos valores para comparar tras el reinicio
+    print("  ⚠ Prueba EXTERNA: ejecutar en el host  .\\scripts\\prueba_08_reinicio_consumidor.ps1")
+    print("    (para el consumidor, publica un evento, lo reinicia y verifica 1 sola fila)")
+    return None
 
 
 # ===========================================================================
@@ -471,8 +491,12 @@ if __name__ == "__main__":
     print("RESUMEN DE PRUEBAS DE ACEPTACIÓN")
     print("="*70)
     for name, ok in results.items():
-        status = "✅ PASA" if ok else "❌ FALLA"
+        if ok is None:
+            status = "⏭️ EXTERNA (.\\scripts\\prueba_08_reinicio_consumidor.ps1)"
+        else:
+            status = "✅ PASA" if ok else "❌ FALLA"
         print(f"  {name:30s} {status}")
-    total_ok = sum(1 for v in results.values() if v)
-    print(f"\n  Total: {total_ok}/{len(results)} pruebas superadas")
-    print("  (Pruebas 9-10 túnel se ejecutan manualmente)")
+    auto_tests = [v for v in results.values() if v is not None]
+    total_ok = sum(1 for v in auto_tests if v)
+    print(f"\n  Total automatizadas en contenedor: {total_ok}/{len(auto_tests)} pruebas superadas")
+    print("  (Prueba 8 con scripts/prueba_08_reinicio_consumidor.ps1 y Pruebas 9-10 de túnel en el host)")

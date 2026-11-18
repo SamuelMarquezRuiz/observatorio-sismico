@@ -1,8 +1,10 @@
 import asyncio
 import json
 import logging
+import os
 import signal
 import sys
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Tuple
 
@@ -27,6 +29,9 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] [CONSUMER] %(message)s"
 )
 logger = logging.getLogger("consumer")
+
+# Latido para el healthcheck de Docker: el proceso lo toca al arrancar y tras cada mensaje.
+HEARTBEAT_FILE = Path(os.getenv("HEARTBEAT_FILE", "/tmp/consumer_heartbeat"))
 
 MESES_ES = {
     1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril", 5: "Mayo", 6: "Junio",
@@ -282,8 +287,15 @@ class TerremotoConsumidor:
             logger.error(f"Error en transacción PostgreSQL procesando evento {event_id}: {e}", exc_info=True)
             return False
 
+    def touch_heartbeat(self):
+        try:
+            HEARTBEAT_FILE.touch()
+        except OSError:
+            pass
+
     async def run(self):
         await self.start()
+        self.touch_heartbeat()
         logger.info("Consumidor esperando mensajes en streaming...")
 
         msg_count = 0
@@ -301,20 +313,36 @@ class TerremotoConsumidor:
                     await self.consumer.commit()
                     continue
 
-                # Procesar transaccionalmente
-                conn = self.get_pg_connection()
-                success = self.procesar_evento_transaccional(conn, payload)
+                # Procesar transaccionalmente. Si falla, se reintenta ESTE mismo mensaje
+                # (con espera progresiva y reconexión) y NO se confirma ningún offset posterior:
+                # así un fallo de PostgreSQL nunca provoca pérdida de datos.
+                backoff = 2.0
+                while self.running:
+                    try:
+                        conn = self.get_pg_connection()
+                        success = self.procesar_evento_transaccional(conn, payload)
+                    except Exception as e:
+                        logger.error(f"PostgreSQL no disponible: {e}")
+                        success = False
+                        self.pg_conn = None
+                    if success:
+                        break
+                    logger.warning(f"Reintentando mensaje en offset {record.offset} en {backoff:.0f}s...")
+                    if self.pg_conn is not None:
+                        try:
+                            self.pg_conn.close()
+                        except Exception:
+                            pass
+                        self.pg_conn = None
+                    await asyncio.sleep(backoff)
+                    backoff = min(backoff * 2, 30.0)
 
-                if success:
-                    # Confirmar el offset SOLO después de commit exitoso en PostgreSQL
-                    await self.consumer.commit()
-                    msg_count += 1
-                    if msg_count % 50 == 0:
-                        logger.info(f"Progreso: {msg_count} mensajes procesados y confirmados exitosamente.")
-                else:
-                    # En caso de fallo transaccional grave, pausar para permitir reintento sin perder el offset
-                    logger.warning(f"Reintentando mensaje en offset {record.offset} tras fallo...")
-                    await asyncio.sleep(2)
+                # Confirmar el offset SOLO después de commit exitoso en PostgreSQL
+                await self.consumer.commit()
+                msg_count += 1
+                self.touch_heartbeat()
+                if msg_count % 50 == 0:
+                    logger.info(f"Progreso: {msg_count} mensajes procesados y confirmados exitosamente.")
 
         except asyncio.CancelledError:
             pass

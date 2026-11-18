@@ -78,10 +78,3 @@ SELECT
 FROM cuarentena
 GROUP BY reason
 ORDER BY total_descartados DESC;
-    MIN(mag) AS mag_min,
-    MAX(mag) AS mag_max
-FROM evento_actual
-WHERE mode = 'live'
-GROUP BY date_trunc('hour', time_utc)
-ORDER BY ventana_hora_utc DESC
-LIMIT 24;

@@ -20,11 +20,16 @@ datos/historico/*.geojson
 !datos/historico/registro_extraccion_2025.json
 
 # Node & Angular
+node_modules/
 frontend/node_modules/
+dist/
 frontend/dist/
+.angular/
 frontend/.angular/
 
-# Docker y temporales
+# Docker, IDEs y temporales
+.vscode/
+.idea/
 *.log
 .DS_Store
 Thumbs.db

@@ -37,14 +37,17 @@ Filtros a implementar: `start` (ISO8601, inclusive), `end` (ISO8601, exclusive),
 
 Para limitar el tamaño, la API puede aplicar un máximo documentado de puntos. Si trunca, debe indicar `truncated: true`, el total completo y un mecanismo de paginación. El panel final deberá mostrarlo y no calcular estadísticas globales sobre una muestra truncada. El componente inicial espera una colección pequeña y completa.
 
-## Otros endpoints a implementar
+## Otros endpoints implementados
 
-| Ruta | Resultado |
-|---|---|
-| GET /api/salud | Estado API y fecha de última ingesta; no credenciales |
-| GET /api/estadisticas | Conteos por hora UTC/país, distribuciones y comparación histórica |
+| Ruta | Parámetros | Resultado |
+|---|---|---|
+| `GET /` | Ninguno | Metadatos del servicio y enlaces de descubrimiento (`/docs`, `/api/salud`, `/api/eventos`, `/api/estadisticas`, `/api/paises`). |
+| `GET /api/salud` | Ninguno | Estado de conexión a PostgreSQL (`postgres_connected`), recuento total (`total_eventos_base`), último latido de ingesta (`last_ingestion`, `last_ingestion_utc`), `segundos_desde_ultima_ingesta` y `estado_ingesta` (`activa` $\le 180\text{ s}$ o `desactualizada`). Nunca expone secretos ni credenciales. |
+| `GET /api/eventos` | `start`, `end`, `min_mag`, `country_id` (`ADM0_A3` o `SIN_PAIS`), `mode` (`live`, `replay`, `historical`), `limit` (hasta `25000`) | `FeatureCollection` GeoJSON con cada sismo en su versión vigente más reciente (`evento_actual`), `metadata.total_coincidentes` y `metadata.truncated`. |
+| `GET /api/estadisticas` | `start`, `end`, `min_mag`, `country_id`, `mode` (`live`, `replay`, `historical`) | `total_eventos`, `resumen_metricas` (incluyendo `total_magnitud_nula`), `por_ventana_hora` (granularidad adaptativa UTC: `hour` en ventanas $\le 3$ días y `day` en rangos mayores o `historical`, informada en `metadata.temporal_granularity`), `por_pais` (incluyendo `"Sin país asignado"`), `distribucion_magnitud`, `distribucion_profundidad` y `comparacion_historica` (últimas 24 h `mag >= 4.0` frente a la media diaria de los 365 días de 2025: `18.302 / 365 = 50,14 sismos/día`). |
+| `GET /api/paises` | Ninguno | Lista ordenada de los 177 países del catálogo Natural Earth (`country_id`, `name`, `continent`, `subregion`) para poblar selectores del panel. |
 
-Los filtros de estadísticas deben equivaler a los del mapa. Cada resultado debe indicar periodo, filtros, unidad y registros sin valor. Si la base falla, devuelve un error explícito; no cero eventos como si fuera un resultado válido.
+Los filtros de `/api/estadisticas` equivalen exactamente a los de `/api/eventos`. Cada resultado indica periodo, filtros, unidad y registros sin valor (`ND`). Si la base de datos falla, devuelve HTTP 500 con detalle explícito; nunca devuelve cero eventos como si fuera una respuesta válida.
 
 ## Acceso desde Netlify
 

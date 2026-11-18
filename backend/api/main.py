@@ -150,8 +150,8 @@ def get_eventos(
     end: Optional[str] = Query(None, description="Fecha fin ISO8601 exclusive"),
     min_mag: Optional[float] = Query(None, description="Magnitud mínima"),
     country_id: Optional[str] = Query(None, description="Código de país ADM0_A3 o 'SIN_PAIS'"),
-    mode: Optional[str] = Query("live", description="Modo operativo: 'live' o 'replay'"),
-    limit: Optional[int] = Query(1000, description="Límite máximo de puntos")
+    mode: Optional[str] = Query("live", description="Modo operativo: 'live', 'replay' o 'historical'"),
+    limit: Optional[int] = Query(None, description="Límite máximo de puntos (sin truncamiento por defecto hasta 25000)")
 ):
     """
     Devuelve FeatureCollection GeoJSON con los terremotos actuales según CONTRATO-API.md.
@@ -212,8 +212,8 @@ def get_eventos(
         r_total = cur.fetchone()
         total_coincidentes = r_total["total"] if r_total else 0
 
-        # 4. Obtener features con límite
-        limite_efectivo = max(1, min(limit or 1000, 5000))
+        # 4. Obtener features sin truncamiento artificial (máximo de seguridad 25.000)
+        limite_efectivo = max(1, min(limit, 25000)) if limit is not None else 25000
         sql = f"""
             SELECT 
                 ea.event_id,
@@ -353,17 +353,29 @@ def get_estadisticas(
         res_general = cur.fetchone() or {}
         total_eventos = res_general.get("total", 0)
 
-        # 2. Ventanas fijas de 1 hora UTC (usando tiempo de ocurrencia time_utc)
+        # 2. Ventanas temporales UTC (por día si es histórico o rango > 3 días, por hora en otro caso)
+        usar_dias = (mode == "historical")
+        if not usar_dias and start and end:
+            try:
+                dt_s = datetime.fromisoformat(start.replace("Z", "+00:00"))
+                dt_e = datetime.fromisoformat(end.replace("Z", "+00:00"))
+                if (dt_e - dt_s).total_seconds() > 3 * 86400:
+                    usar_dias = True
+            except Exception:
+                pass
+
+        trunc_unit = "day" if usar_dias else "hour"
+
         cur.execute(f"""
             SELECT 
-                date_trunc('hour', ea.time_utc) AS ventana_utc,
+                date_trunc('{trunc_unit}', ea.time_utc AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AS ventana_utc,
                 COUNT(*) AS count,
                 ROUND(AVG(ea.mag)::numeric, 2) AS mag_media,
                 ROUND(MIN(ea.mag)::numeric, 2) AS mag_min,
                 ROUND(MAX(ea.mag)::numeric, 2) AS mag_max
             FROM evento_actual ea
             WHERE {where_sql}
-            GROUP BY date_trunc('hour', ea.time_utc)
+            GROUP BY 1
             ORDER BY ventana_utc ASC;
         """, params)
         rows_ventanas = cur.fetchall()
@@ -524,6 +536,7 @@ def get_estadisticas(
         "metadata": {
             "generated": now_ms,
             "mode": mode,
+            "temporal_granularity": trunc_unit,
             "periodo_consultado": {
                 "start": start or "últimas 24 horas",
                 "end": end or "actual"

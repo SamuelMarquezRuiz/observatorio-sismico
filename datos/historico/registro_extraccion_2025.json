@@ -1,20 +1,109 @@
 {
-  "fecha_extraccion_utc": "2026-11-18T10:17:52.083665+00:00",
+  "fecha_extraccion_utc": "2026-11-18T18:49:14.150152+00:00",
   "fuente": "USGS Earthquake Catalog FDSNWS API",
+  "criterio": "Magnitud >= 4.0, tipo earthquake, orden time-asc",
   "min_mag": 4.0,
   "anio": 2025,
+  "dias_periodo_anual": 365,
   "meses": [
     {
       "periodo": "2025-01-01T00:00:00Z - 2025-02-01T00:00:00Z",
       "archivo": "2025_mes_01.geojson",
+      "url": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-01-01T00:00:00Z&endtime=2025-02-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc",
       "registros": 1413,
-      "insertados": 1413
+      "insertados": 1413,
+      "fecha_descarga_utc": "2026-11-18T18:49:15.351753+00:00"
     },
     {
       "periodo": "2025-02-01T00:00:00Z - 2025-03-01T00:00:00Z",
       "archivo": "2025_mes_02.geojson",
+      "url": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-02-01T00:00:00Z&endtime=2025-03-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc",
       "registros": 1394,
-      "insertados": 1394
+      "insertados": 1394,
+      "fecha_descarga_utc": "2026-11-18T18:49:16.595289+00:00"
+    },
+    {
+      "periodo": "2025-03-01T00:00:00Z - 2025-04-01T00:00:00Z",
+      "archivo": "2025_mes_03.geojson",
+      "url": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-03-01T00:00:00Z&endtime=2025-04-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc",
+      "registros": 1178,
+      "insertados": 1178,
+      "fecha_descarga_utc": "2026-11-18T18:49:19.573582+00:00"
+    },
+    {
+      "periodo": "2025-04-01T00:00:00Z - 2025-05-01T00:00:00Z",
+      "archivo": "2025_mes_04.geojson",
+      "url": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-04-01T00:00:00Z&endtime=2025-05-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc",
+      "registros": 1316,
+      "insertados": 1316,
+      "fecha_descarga_utc": "2026-11-18T18:49:22.386849+00:00"
+    },
+    {
+      "periodo": "2025-05-01T00:00:00Z - 2025-06-01T00:00:00Z",
+      "archivo": "2025_mes_05.geojson",
+      "url": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-05-01T00:00:00Z&endtime=2025-06-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc",
+      "registros": 1228,
+      "insertados": 1228,
+      "fecha_descarga_utc": "2026-11-18T18:49:25.451017+00:00"
+    },
+    {
+      "periodo": "2025-06-01T00:00:00Z - 2025-07-01T00:00:00Z",
+      "archivo": "2025_mes_06.geojson",
+      "url": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-06-01T00:00:00Z&endtime=2025-07-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc",
+      "registros": 1156,
+      "insertados": 1156,
+      "fecha_descarga_utc": "2026-11-18T18:49:28.564099+00:00"
+    },
+    {
+      "periodo": "2025-07-01T00:00:00Z - 2025-08-01T00:00:00Z",
+      "archivo": "2025_mes_07.geojson",
+      "url": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-07-01T00:00:00Z&endtime=2025-08-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc",
+      "registros": 2684,
+      "insertados": 2684,
+      "fecha_descarga_utc": "2026-11-18T18:49:33.156041+00:00"
+    },
+    {
+      "periodo": "2025-08-01T00:00:00Z - 2025-09-01T00:00:00Z",
+      "archivo": "2025_mes_08.geojson",
+      "url": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-08-01T00:00:00Z&endtime=2025-09-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc",
+      "registros": 2222,
+      "insertados": 2222,
+      "fecha_descarga_utc": "2026-11-18T18:49:36.887017+00:00"
+    },
+    {
+      "periodo": "2025-09-01T00:00:00Z - 2025-10-01T00:00:00Z",
+      "archivo": "2025_mes_09.geojson",
+      "url": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-09-01T00:00:00Z&endtime=2025-10-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc",
+      "registros": 1604,
+      "insertados": 1604,
+      "fecha_descarga_utc": "2026-11-18T18:49:40.374569+00:00"
+    },
+    {
+      "periodo": "2025-10-01T00:00:00Z - 2025-11-01T00:00:00Z",
+      "archivo": "2025_mes_10.geojson",
+      "url": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-10-01T00:00:00Z&endtime=2025-11-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc",
+      "registros": 1509,
+      "insertados": 1509,
+      "fecha_descarga_utc": "2026-11-18T18:49:43.594364+00:00"
+    },
+    {
+      "periodo": "2025-11-01T00:00:00Z - 2025-12-01T00:00:00Z",
+      "archivo": "2025_mes_11.geojson",
+      "url": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-11-01T00:00:00Z&endtime=2025-12-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc",
+      "registros": 1321,
+      "insertados": 1321,
+      "fecha_descarga_utc": "2026-11-18T18:49:46.325742+00:00"
+    },
+    {
+      "periodo": "2025-12-01T00:00:00Z - 2026-01-01T00:00:00Z",
+      "archivo": "2025_mes_12.geojson",
+      "url": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-12-01T00:00:00Z&endtime=2026-01-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc",
+      "registros": 1277,
+      "insertados": 1277,
+      "fecha_descarga_utc": "2026-11-18T18:49:49.453090+00:00"
     }
-  ]
+  ],
+  "total_anual_descargado": 18302,
+  "total_anual_deduplicado_en_bd": 18302,
+  "media_diaria_anual_2025": 50.14
 }

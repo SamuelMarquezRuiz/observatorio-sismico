@@ -75,30 +75,43 @@ flowchart LR
 | Conjunto | Fuente Oficial | Periodo y Filtros | Procedimiento de Extracción y Persistencia | Volumen Real Obtenido |
 |---|---|---|---|:---:|
 | **Recientes (Streaming en vivo)** | USGS Earthquakes Feed (`all_day.geojson`) | Ventana móvil de las últimas 24 horas. Actualización continua. | Sondeo HTTP GET asíncrono cada 60 s con cabecera User-Agent dedicada. Filtrado local de novedades por `(id, updated)`. Publicación en topic Kafka `terremotos.live`. | 198 eventos en ventana actual |
-| **Histórico 2025** | API Catálogo USGS FDSNWS (`/fdsnws/event/1/query`) | Año 2025, ámbito mundial, magnitud $\ge 4.0$, `eventtype=earthquake`, orden cronológico `time-asc`. | Particionado mensual en 12 intervalos para no superar el límite de 20.000 registros por llamada de USGS. Script [`carga_historica.py`](file:///c:/Users/marqu/Desktop/IABD/BD/observatorio-sismico-materiales/observatorio-sismico/backend/scripts/carga_historica.py). Archivos GeoJSON guardados en `datos/historico/`. | **2.807 eventos** consolidados |
+| **Histórico 2025** | API Catálogo USGS FDSNWS (`/fdsnws/event/1/query`) | Año 2025 completo (365 días), ámbito mundial, magnitud $\ge 4.0$, `eventtype=earthquake`, orden cronológico `time-asc`. | Particionado mensual en 12 intervalos para respetar el límite de 20.000 registros de USGS. Script [`carga_historica.py`](file:///c:/Users/marqu/Desktop/IABD/BD/observatorio-sismico-materiales/observatorio-sismico/backend/scripts/carga_historica.py). Archivos GeoJSON guardados en `datos/historico/`. | **18.302 eventos** consolidados |
 | **Catálogo Geográfico** | Natural Earth (`1:110m Cultural Vectors`) | 177 entidades soberanas mundiales (`paises.geojson`). | Carga en memoria e indexación jerárquica con `shapely.STRtree` (R-Tree). Atributos: `ADM0_A3`, `NAME_ES`, `CONTINENT`, `SUBREGION`. | 177 polígonos indexados |
 
 ### 3.1. Registro Detallado de Consultas Históricas (Metadatos de Procedencia)
-Guardado en [`datos/historico/registro_extraccion_2025.json`](file:///c:/Users/marqu/Desktop/IABD/BD/observatorio-sismico-materiales/observatorio-sismico/datos/historico/registro_extraccion_2025.json):
-* **Mes 1 (Enero 2025):** `starttime=2025-01-01T00:00:00Z` a `endtime=2025-02-01T00:00:00Z` $\rightarrow$ **1.413 terremotos**.
-* **Mes 2 (Febrero 2025):** `starttime=2025-02-01T00:00:00Z` a `endtime=2025-03-01T00:00:00Z` $\rightarrow$ **1.394 terremotos**.
-* **Total registros históricos insertados:** 2.807 eventos deduplicados con `mode='historical'`.
+Guardado y trazado en [`datos/historico/registro_extraccion_2025.json`](file:///c:/Users/marqu/Desktop/IABD/BD/observatorio-sismico-materiales/observatorio-sismico/datos/historico/registro_extraccion_2025.json):
+
+| Mes | Intervalo UTC | Archivo GeoJSON | Eventos Obtenidos | URL de Consulta Oficial USGS |
+|---|---|---|:---:|---|
+| **Enero** | `2025-01-01` a `2025-02-01` | `2025_mes_01.geojson` | 1.413 | `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-01-01T00:00:00Z&endtime=2025-02-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc` |
+| **Febrero** | `2025-02-01` a `2025-03-01` | `2025_mes_02.geojson` | 1.394 | `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-02-01T00:00:00Z&endtime=2025-03-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc` |
+| **Marzo** | `2025-03-01` a `2025-04-01` | `2025_mes_03.geojson` | 1.178 | `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-03-01T00:00:00Z&endtime=2025-04-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc` |
+| **Abril** | `2025-04-01` a `2025-05-01` | `2025_mes_04.geojson` | 1.316 | `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-04-01T00:00:00Z&endtime=2025-05-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc` |
+| **Mayo** | `2025-05-01` a `2025-06-01` | `2025_mes_05.geojson` | 1.228 | `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-05-01T00:00:00Z&endtime=2025-06-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc` |
+| **Junio** | `2025-06-01` a `2025-07-01` | `2025_mes_06.geojson` | 1.156 | `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-06-01T00:00:00Z&endtime=2025-07-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc` |
+| **Julio** | `2025-07-01` a `2025-08-01` | `2025_mes_07.geojson` | 2.684 | `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-07-01T00:00:00Z&endtime=2025-08-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc` |
+| **Agosto** | `2025-08-01` a `2025-09-01` | `2025_mes_08.geojson` | 2.222 | `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-08-01T00:00:00Z&endtime=2025-09-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc` |
+| **Septiembre** | `2025-09-01` a `2025-10-01` | `2025_mes_09.geojson` | 1.604 | `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-09-01T00:00:00Z&endtime=2025-10-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc` |
+| **Octubre** | `2025-10-01` a `2025-11-01` | `2025_mes_10.geojson` | 1.509 | `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-10-01T00:00:00Z&endtime=2025-11-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc` |
+| **Noviembre** | `2025-11-01` a `2025-12-01` | `2025_mes_11.geojson` | 1.321 | `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-11-01T00:00:00Z&endtime=2025-12-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc` |
+| **Diciembre** | `2025-12-01` a `2026-01-01` | `2025_mes_12.geojson` | 1.277 | `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-12-01T00:00:00Z&endtime=2026-01-01T00:00:00Z&minmagnitude=4.0&eventtype=earthquake&orderby=time-asc` |
+| **TOTAL ANUAL** | **Año 2025 (365 días)** | **12 archivos** | **18.302** | **Media diaria anual consolidada: 50.14 sismos/día** |
 
 ---
 
 ## 4. Calidad del Dato y Tratamiento en Streaming
 
 ### 4.1. Tabla de Calidad Antes y Después del Tratamiento
-Evaluación cuantitativa sobre el total de 3.005 eventos procesados en PostgreSQL:
+Evaluación cuantitativa ejecutable con [`sql/calidad.sql`](file:///c:/Users/marqu/Desktop/IABD/BD/observatorio-sismico-materiales/observatorio-sismico/sql/calidad.sql) y [`backend/tests/test_calidad_rendimiento.py`](file:///c:/Users/marqu/Desktop/IABD/BD/observatorio-sismico-materiales/observatorio-sismico/backend/tests/test_calidad_rendimiento.py) sobre el total de **18.592 eventos vigentes** (`18.302` históricos 2025 + `279` live + `2` replay + `9` test aislados) y **18.791 versiones** en PostgreSQL:
 
 | Dimensión de Calidad | Situación Antes del Tratamiento | Regla Aplicada en el Consumidor | Situación Después del Tratamiento | Justificación Técnica de la Decisión |
 |---|---|---|---|---|
-| **Completitud** | 1 evento con `mag = null`. 1.965 eventos en mar sin país. | Se preserva `mag = NULL`; se asigna `country_id = NULL`. | 99.97% completitud en magnitud; 100% en coordenadas y fechas. | No se sustituye la magnitud ausente por 0 para no falsear los cálculos de medias o histogramas. Los sismos marítimos no se asignan al país más cercano porque violaría la veracidad cartográfica. |
-| **Unicidad** | Repetición de eventos en el feed de USGS cada 60 s y reintentos de red. | Upsert condicional en PostgreSQL + Primary Key en `event_id` y `(event_id, updated_utc)`. | **3.005 eventos únicos** en `evento_actual` (0 duplicados). 3.045 versiones únicas en `evento_version`. | Idempotencia matemática garantizada: reenviar el mismo mensaje produce exactamente el mismo estado en la base de datos sin duplicar filas. |
-| **Validez** | Eventos no sísmicos en USGS (`quarry blast`, `explosion`) y coordenadas corruptas. | Validación estricta de coordenadas $[-180, 180], [-90, 90]$ y filtro `properties.type == 'earthquake'`. | 0 registros corruptos en `evento_actual`. 5 registros desviados a `cuarentena`. | Los terremotos son fenómenos tectónicos; incluir detonaciones mineras falsearía el estudio de fallas terrestres. |
-| **Consistencia** | Fechas en milisegundos Unix; diferencias en códigos de países. | Conversión a `TIMESTAMPTZ` en UTC y asignación espacial contra el catálogo maestro de 177 países. | 0 claves foráneas rotas contra `pais` o `fecha`. 100% de coherencia referencial. | Centralizar la hora en UTC elimina problemas de husos horarios y cambios de hora locales. |
-| **Actualidad** | Latencia de publicación en las redes sismológicas locales de USGS. | Ingesta continua en streaming cada 60 s y actualización del timestamp `last_ingestion_success`. | Lag de ingesta en el sistema inferior a 60 segundos. | El observatorio refleja novedades casi instantáneamente desde el momento en que USGS las publica. |
-| **Exactitud** | Posibles discordancias en zonas costeras por simplificación geométrica. | Uso de `shapely.STRtree` a escala 1:110m. Se documenta la limitación. | Asignación geoespacial determinista y reproducible. | Se documenta que sismos muy próximos a costas recortadas pueden catalogarse como marítimos. |
+| **Completitud** | 2 eventos con `mag = null`. 14.400 eventos en mar sin país (`77,48 %`). | Se preserva `mag = NULL` (`ND`); se asigna `country_id = NULL` («Sin país asignado»). | **99,99 %** completitud en magnitud; **100,00 %** en coordenadas, profundidad, `place` y fechas. | No se sustituye la magnitud ausente por `0` para no sesgar medias ni histogramas. Los sismos marítimos no se asignan al país más cercano porque el océano internacional no pertenece a una jurisdicción nacional. |
+| **Unicidad** | Repetición de la ventana de 24 h cada 60 s en el feed y posibles eventos en frontera entre meses. | Caché `O(1)` + SQLite en productor y upsert condicional en PostgreSQL con PK `event_id` y PK compuesta `(event_id, updated_utc)`. | **18.592 eventos únicos** en `evento_actual` (`0` duplicados). **18.791 versiones únicas** en `evento_version` (`46` sismos con múltiples revisiones). | Idempotencia matemática: reenviar la misma versión no altera ningún recuento; los casos sintéticos se aíslan bajo `mode = 'test'`. |
+| **Validez** | Eventos no sísmicos en USGS (`2 quarry blast`, `1 explosion`), coordenadas fuera de rango y magnitudes/profundidades negativas reales. | Filtro `properties.type == 'earthquake'` (con registro en `excluded_events` y `cuarentena`), validación `lon ∈ [-180,180]`, `lat ∈ [-90,90]` y geometría `Point`. | `0` registros corruptos en `evento_actual`. **6 registros** aislados en `cuarentena` con payload original. **5 magnitudes negativas** y **5 profundidades negativas** válidas conservadas. | La escala de magnitud es logarítmica (microsismos con `mag < 0` son reales) y una profundidad negativa (`-2,74 km`) indica foco sobre el nivel del mar (edificios volcánicos). |
+| **Consistencia** | Timestamps en milisegundos Unix; códigos `ADM0_A3` de Natural Earth; revisiones que podrían llegar desordenadas. | Conversión a `TIMESTAMPTZ` UTC (`ms / 1000.0`), cruce contra las 177 entidades de `pais` y cláusula `WHERE EXCLUDED.updated_utc > evento_actual.updated_utc`. | `0` claves foráneas rotas (`fk_pais_rotas = 0`, `fk_fecha_rotas = 0`) y `0` desincronizaciones entre `evento_actual` y la última versión en `evento_version`. | Garantiza que el estado actual siempre refleje la revisión más moderna aunque Kafka entregue una versión antigua con retraso. |
+| **Actualidad** | Retraso entre la ocurrencia física (`time`), la revisión en USGS (`updated`) y la ingesta (`received_at`). | Sondeo cada 60 s, registro de `ingested_at` y actualización de `estado_ingesta.last_ingestion_success`. | Lag del pipeline $< 60\text{ s}$; latencia observada USGS $\rightarrow$ BD en `live`: mediana **37.746 s** (~10,5 h) por revisiones sismológicas sobre la ventana de 24 h. | Separar `time_utc`, `updated_utc` y `received_at` permite distinguir la latencia propia del pipeline (< 1 min) del tiempo de revisión humana en USGS. |
+| **Exactitud** | Simplificación costera del catálogo Natural Earth 1:110m y heterogeneidad de escalas (`mb`, `mww`, `ml`, `md`). | Cruce espacial determinista con `shapely.STRtree` en WGS84 (`EPSG:4326`) y conservación de `mag_type`. | `16.332` eventos `mb` (media `4,44`), `1.476` `mww` (media `5,31`), `354` `mwr` (`4,37`). | No se contrasta con otras agencias (EMSC/IGN); se documenta que la escala 1:110m puede clasificar sismos costeros como marítimos. |
 
 ---
 
@@ -196,107 +209,103 @@ El script DDL se encuentra en [`sql/init.sql`](file:///c:/Users/marqu/Desktop/IA
 
 ## 6. Análisis y Conclusiones Fundamentadas
 
-A partir del análisis exhaustivo del conjunto de 3.005 eventos consolidados en PostgreSQL, se extraen tres conclusiones fundamentales:
+A partir del análisis exhaustivo del catálogo anual completo de **18.302 terremotos históricos de 2025** (`mode = 'historical'`, `mag >= 4.0`, `eventtype = 'earthquake'`, 365 días) y los **279 eventos recientes en vivo** (`mode = 'live'`), se extraen tres conclusiones fundamentadas:
 
-### Conclusión 1: Predominancia Absoluta de Sismos Superficiales en Zonas de Subducción
-* **Datos y Filtros:** Población total analizada: 3.005 eventos sísmicos en `evento_actual`.
-* **Cifras:**
-  * **Sismos superficiales (profundidad $< 70\text{ km}$):** **2.253 eventos (74.98%)**, con una mediana de profundidad de solo **10.0 km**.
-  * **Sismos intermedios ($70 \le \text{profundidad} < 300\text{ km}$):** **567 eventos (18.87%)**.
-  * **Sismos profundos ($\ge 300\text{ km}$):** **185 eventos (6.15%)**, con un máximo registrado de 650.63 km.
-* **Interpretación Técnica:** Casi tres cuartas partes de los terremotos registrados se originan en la corteza terrestre superior (litosfera rígida). Los sismos profundos se concentran exclusivamente en planos de Benioff asociados al Cinturón de Fuego del Pacífico (zonas de subducción profunda como Fiyi, Tonga y la fosa de las Marianas).
+> **Advertencia Metodológica sobre Sesgos de Detección y No-Predicción:** Las estadísticas de este observatorio describen actividad registrada en el pasado y presente, **nunca constituyen predicción sísmica ni evaluación de riesgo sísmico**. Además, la cobertura instrumental de USGS no es uniforme: en territorio continental de EE. UU. (California, Alaska) la red detecta microsismos de magnitud $< 1,5$ (`ml`/`md`), mientras que en dorsales oceánicas remotas el umbral de completitud global se sitúa en torno a `mag >= 4,0` (`mb`/`mww`). Por ello, toda comparativa entre regiones o frente al histórico debe aplicar un umbral común (`mag >= 4,0`).
 
-### Conclusión 2: Carácter Mayoritariamente Oceánico y Distribución Geográfica
-* **Datos y Filtros:** Total de 3.005 eventos clasificados con el catálogo Natural Earth 1:110m.
-* **Cifras:**
-  * **Eventos marítimos («Sin país asignado»):** **1.965 eventos (65.39%)**.
-  * **Eventos sobre territorio nacional asignado:** **1.040 eventos (34.61%)**.
-  * **Países con mayor actividad tectónica continental:**
-    1. **Etiopía (`ETH`):** 228 eventos (enjambre sísmico en el Gran Valle del Rift, magnitud media 4.46, profundidad media 10.1 km).
-    2. **Estados Unidos (`USA`):** 156 eventos (falla de San Andrés y microterremotos de California/Alaska, magnitud media 1.68).
-    3. **China (`CHN`):** 133 eventos (colisión tectónica de la placa Índica con la placa Euroasiática en Tíbet/Sichuan, magnitud media 4.45).
-    4. **Chile (`CHL`):** 66 eventos (zona de subducción Nazca-Sudamericana, profundidad media de 96.9 km).
-* **Interpretación Técnica:** El 65.39% de la actividad sísmica global ocurre en dorsales centro-oceánicas o fosas marinas alejadas de las masas continentales. La preservación de la categoría «Sin país asignado» es vital para la completitud del observatorio; de lo contrario, se ignorarían dos de cada tres sismos globales.
+### Conclusión 1: Predominancia de Sismicidad Cortical Superficial y Gradiente de Subducción Andina (Plano de Wadati-Benioff)
+* **Datos, Periodo y Filtros:** Catálogo anual completo 2025 (`18.302` eventos globales con `mag >= 4,0` y `type = 'earthquake'`).
+* **Cifras Exactas:**
+  * **Sismos superficiales ($< 70\text{ km}$):** **13.688 eventos (74,79 %)** del total anual.
+  * **Sismos intermedios ($70\text{–}299\text{ km}$):** **3.512 eventos (19,19 %)**.
+  * **Sismos profundos ($\ge 300\text{ km}$):** **1.102 eventos (6,02 %)**, alcanzando un máximo de **669,56 km**.
+  * **Contraste geofísico por país:** En zonas de colisión intraplaca o rifting continental la profundidad media es muy somera (**Etiopía `ETH`**: 265 sismos, profundidad media **10,0 km**; **China `CHN`**: 354 sismos, profundidad media **13,9 km**), mientras que en la subducción de la placa de Nazca bajo Sudamérica la profundidad media aumenta desde la costa (**Chile `CHL`**: 348 sismos, profundidad media **99,1 km**) hacia el trasarco continental (**Argentina `ARG`**: 236 sismos, profundidad media **173,3 km**).
+* **Interpretación Técnica:** Tres de cada cuatro terremotos de magnitud $\ge 4,0$ liberan energía en la corteza frágil superior ($< 70\text{ km}$), y el gradiente Chile $\rightarrow$ Argentina reconstruye empíricamente la inclinación del plano de subducción de Wadati-Benioff.
 
-### Conclusión 3: Comparativa Histórica Equivalente y Retardo de Publicación (*Reporting Lag*)
-* **Datos y Filtros:** Terremotos con magnitud $\ge 4.0$ en el histórico de 2025 vs. últimas 24 horas del feed live.
-* **Cifras:**
-  * **Histórico 2025 (Enero-Febrero, 59 días):** 2.807 eventos $\rightarrow$ **Media diaria de 47.58 eventos/día**.
-  * **Últimas 24 horas en streaming (`live`):** **28 eventos**.
-  * **Ratio de actividad reciente vs. media histórica:** $28 / 47.58 = \mathbf{58.85\%}$.
-* **Interpretación Técnica:** Esta aparente disminución del 41.15% en las últimas 24 horas **no indica una desaceleración de la actividad tectónica del planeta**, sino el efecto intrínseco del retardo de consolidación (*reporting lag*) de USGS: los terremotos de magnitud moderada ($4.0 \le \text{mag} < 4.5$) en regiones con baja densidad de sismógrafos tardan entre 12 y 48 horas en ser revisados por analistas humanos e incorporados al catálogo consolidado. La comparativa histórica demuestra que una ventana reciente incompleta debe interpretarse siempre considerando la latencia de la fuente.
+### Conclusión 2: Carácter Mayoritariamente Oceánico de la Sismicidad Global y Necesidad de la Categoría «Sin país asignado»
+* **Datos, Periodo y Filtros:** `18.302` terremotos de 2025 (`mag >= 4,0`) cruzados espacialmente con los 177 polígonos de Natural Earth 1:110m (`WGS84 / EPSG:4326`).
+* **Cifras Exactas:**
+  * **Eventos marítimos / «Sin país asignado» (`country_id IS NULL`):** **14.350 eventos (78,41 %)**, con magnitud media **4,53** y profundidad media **74,8 km**.
+  * **Eventos en territorio continental asignado:** **3.952 eventos (21,59 %)** repartidos en países soberanos, encabezados por **China (`CHN`, 354)**, **Chile (`CHL`, 348)**, **Indonesia (`IDN`, 306)**, **Etiopía (`ETH`, 265)**, **Argentina (`ARG`, 236)** y **Papúa Nueva Guinea (`PNG`, 192)**.
+* **Interpretación Técnica:** Casi cuatro de cada cinco sismos globales $\ge 4,0$ ocurren en dorsales centro-oceánicas, fosas submarinas o márgenes costeros fuera de los polígonos terrestres. Si el pipeline descartara los registros con `country_id = NULL` o intentara extraer el país por heurística de texto sobre `place`, perdería o asignaría erróneamente el **78,41 %** del catálogo mundial.
+
+### Conclusión 3: Comparativa Histórica Equivalente (Últimas 24 h vs. Media Diaria Anual 2025) y Retardo de Consolidación (*Reporting Lag*)
+* **Datos, Periodo y Filtros:** Comparación bajo filtros idénticos (`mag >= 4,0`, `eventtype = 'earthquake'`, ámbito mundial) entre las últimas 24 horas en vivo (`mode = 'live'`) y los **365 días completos de 2025** (incluyendo días con 0 eventos en cualquier filtro geográfico).
+* **Cifras Exactas:**
+  * **Histórico 2025 completo (12 meses, 365 días):** **18.302 eventos** $\rightarrow$ **Media diaria anual de 50,14 sismos/día** ($18.302 / 365$).
+  * **Últimas 24 horas en streaming (`live`, `mag >= 4,0`):** **23 eventos**.
+  * **Diferencia absoluta y variación:** $-27,14$ eventos frente a la media diaria $\rightarrow$ **Variación de $-54,13\ \%$**.
+* **Interpretación Técnica:** Una lectura inferior a la media diaria en la ventana móvil de las últimas 24 horas combina la variabilidad natural diaria con el retardo de consolidación (*reporting lag*) de sismos moderados ($4,0 \le \text{mag} < 4,5$) en cuencas oceánicas lejanas, cuyas soluciones telesísmicas preliminares se incorporan o revisan horas después del evento físico.
 
 ---
 
 ## 7. Complejidad, Mediciones de Rendimiento y Costes
 
-### 7.1. Análisis Teórico de Complejidad
+### 7.1. Análisis Teórico de Complejidad (Caso Medio y Peor Caso)
 
-| Componente / Operación | Implementación | Complejidad | Justificación Algorítmica |
-|---|---|:---:|---|
-| **Caché en Productor** | `dict` en RAM + tabla SQLite | **$O(1)$** | Búsqueda en tabla hash en memoria amortizada $O(1)$ para descarte instantáneo de eventos ya conocidos antes de emitir a Kafka. |
-| **Búsqueda por clave primaria** | Índice B-Tree en `event_id` | **$O(\log N)$** | El árbol B-Tree en disco permite localizar la página de datos en profundidad fija $\log_B N$. |
-| **Upsert condicional** | `INSERT ... ON CONFLICT DO UPDATE` | **$O(\log N)$** | Comprobación de colisión por índice B-Tree y actualización atómica en la misma página de datos. |
-| **Integración espacial** | `shapely.STRtree` (Sort-Tile-Recursive) | **$O(\log P)$** | R-Tree espacial bidimensional que descarta el 95% de polígonos mediante *bounding boxes* antes de ejecutar el algoritmo de cruce de rayos (*Ray Casting*). |
-| **Agregación por ventanas horarias** | `GROUP BY date_trunc('hour', time_utc)` | **$O(N)$** | Requiere escanear las filas que satisfacen el predicado temporal. |
+| Operación / Estructura | Implementación en el Proyecto | Caso Medio | Peor Caso | Justificación Algorítmica |
+|---|---|:---:|:---:|---|
+| **1. Búsqueda de versión por identificador (`event_id`)** | Tabla hash `dict` en RAM del productor (`PersistentState._cache`) + índice B-Tree `evento_actual_pkey` / `evento_version_pkey` en PostgreSQL | **$O(1)$** en RAM / **$O(\log_B N)$** en B-Tree | **$O(N)$** por colisión de hash / **$O(\log_B N)$** en B-Tree balanceado | El productor descarta en RAM en $O(1)$ versiones ya publicadas; en PostgreSQL el árbol B-Tree balanceado mantiene altura $\le 3$ para $1,8 \times 10^4$ filas y $\le 5$ para $10^8$ filas. |
+| **2. Integración espacial punto-en-polígono** | Índice R-Tree `shapely.STRtree` sobre $P = 177$ entidades y prueba geométrica exacta (`contains`/`touches`) sobre candidatos | **$O(\log P + k \cdot \bar{v})$** ($k \approx 1\text{–}2$ candidatos) | **$O(P \cdot V_{\max})$** si todos los *bounding boxes* solaparan el punto | El R-Tree filtra en $O(\log P)$ los rectángulos envolventes y ejecuta *ray casting* solo sobre $k \ll P$ polígonos con $v$ vértices, frente a $O(P \cdot V)$ de una búsqueda lineal. |
+| **3. Agregación por ventanas temporales** | `GROUP BY date_trunc('hour' \| 'day', time_utc)` con apoyo del índice `idx_evento_actual_time` | **$O(M)$** con *Index Scan* sobre las $M$ filas del rango temporal | **$O(N \log N)$** (*Seq Scan* + *Sort/GroupAggregate* sobre toda la tabla) | Cuando la ventana está acotada (24 h), PostgreSQL lee solo las $M \ll N$ filas del índice; para todo el año ($M = N$), recorre las $N$ filas del modo seleccionado. |
 
-### 7.2. Mediciones Empíricas Reales (3 Tamaños de Lote)
-Medidas en PostgreSQL con el script [`test_calidad_rendimiento.py`](file:///c:/Users/marqu/Desktop/IABD/BD/observatorio-sismico-materiales/observatorio-sismico/backend/tests/test_calidad_rendimiento.py):
+### 7.2. Mediciones Empíricas Reales (3 Tamaños de Entrada)
+Ejecutadas con [`backend/tests/test_calidad_rendimiento.py`](file:///c:/Users/marqu/Desktop/IABD/BD/observatorio-sismico-materiales/observatorio-sismico/backend/tests/test_calidad_rendimiento.py) sobre **18.575 filas reales** en PostgreSQL 16 (contenedor Docker local en Windows 11 / WSL2, CPU x86_64 multinúcleo, SSD NVMe):
 
-| Operación | Tamaño Lote (N) | Tiempo de Ejecución (ms) | Memoria RAM Asignada |
-|---|:---:|:---:|:---:|
-| **Búsqueda por PK (Index Scan)** | 1 registro | **3.15 ms** | 12.0 KB |
-| | 100 registros | **15.59 ms** | 550.4 KB |
-| | 1.000 registros | **146.31 ms** | 5.509 KB |
-| **Búsqueda forzada sin índice (Seq Scan)** | 1 registro | **4.33 ms** (Speedup del índice: **2.2x**) | - |
-| **Agregación por ventanas (GROUP BY)** | Ventana 6 horas | **1.88 ms** | 3.4 KB |
-| | Ventana 24 horas | **2.40 ms** | 11.7 KB |
-| | Dataset completo (3.005 filas) | **19.75 ms** | 560.2 KB |
-| **Filtro por país (CHL)** | 66 filas devueltas | **10.04 ms** | 18.2 KB |
+| Operación Evaluada | Tamaño de Entrada ($N$) | Tiempo Medido (ms) | Memoria Asignada (KB) | Comportamiento Observado |
+|---|:---:|:---:|:---:|---|
+| **A) Búsqueda de versión por PK (`event_id`)** | 1 consulta | **0,994 ms** | 11,2 KB | Acceso directo B-Tree ($O(\log N)$). |
+| | 100 consultas (`IN`) | **9,034 ms** | 548,8 KB | Escala sublineal por lote. |
+| | 1.000 consultas (`IN`) | **98,789 ms** | 5.498,8 KB | Ratio $1000/100 = 10,93\times$ (lineal con el tamaño del lote de búsqueda). |
+| **B) Comparativa CON índice PK vs. SIN índice (`enable_indexscan=off`)** | 1 búsqueda sobre 18.575 filas | **1,014 ms** (con índice) vs. **4,707 ms** (Seq Scan) | 11,2 KB | **Speedup de $4,6\times$** ya con 18.575 filas; la brecha crece linealmente con $N$. |
+| **C) Agregación por ventanas (`GROUP BY date_trunc`)** | Ventana 6 horas | **0,903 ms** | 4,4 KB | Escanea solo las filas recientes. |
+| | Ventana 24 horas | **1,136 ms** | 13,1 KB | Tiempo casi idéntico gracias al índice temporal. |
+| | Histórico completo (18.575 filas) | **79,918 ms** | 3.340,1 KB | Crecimiento $O(N)$ con el número total de registros agrupados. |
+| **D) Integración geográfica por `country_id`** | 1 país (`CHL`) / 5 países / `GROUP BY` global | **29,87 ms** / **98,90 ms** / **2,41 ms** | < 60 KB | Uso de `idx_evento_actual_country`. |
 
-### 7.3. Extrapolación a 100 Millones de Registros
-Si el volumen alcanzara $10^8$ registros (escala de 33.278x):
-1. **Búsqueda por PK:** La profundidad del árbol B-Tree solo aumentaría de nivel 2 a nivel 4. El tiempo de respuesta subiría apenas de **3.1 ms a ~4.5 ms** ($O(\log N)$).
-2. **Escaneo sin índice:** Escalaría de 4.3 ms a **más de 140 segundos**, bloqueando los núcleos de CPU.
-3. **Agregación de ventanas:** Pasaría de 19.7 ms a **más de 10 minutos** si la tabla no está particionada.
+### 7.3. Extrapolación a 100 Millones de Registros ($10^8$ filas, factor de escala $5.384\times$)
+1. **Búsqueda de versión por PK (B-Tree):** Al crecer de $1,85 \times 10^4$ a $10^8$ filas, la altura del B-Tree pasa de 2–3 a 4–5 niveles ($\log_2(10^8)/\log_2(1,85\times 10^4) \approx 1,87\times$). El tiempo por búsqueda se mantendría en **~1,5–2,0 ms** ($O(\log N)$).
+2. **Búsqueda sin índice (Seq Scan):** Crece linealmente ($O(N) \times 5.384$): pasaría de `4,707 ms` a **~25,3 segundos por consulta**, haciendo inviable la deduplicación en streaming.
+3. **Agregación por ventanas sin particionado:** Pasaría de `79,9 ms` a **~430 segundos (~7,2 minutos)** si tuviera que escanear los 100M de registros.
 
-### 7.4. Estimación de Costes de Infraestructura
-- **Entorno Local (Desarrollo / Evaluación):** Coste monetario de 0 € directos, pero requiere ~4 GB de RAM de anfitrión, 10 GB de disco SSD y ~15 W de consumo eléctrico del equipo (~0.05 €/día).
-- **Despliegue Cloud en Producción (AWS / GCP):**
-  - Instancia managed Kafka (ej. Confluent Cloud o AWS MSK 2 brokers): ~80 €/mes.
-  - Instancia PostgreSQL administrada (AWS RDS db.t4g.medium, 2 vCPU, 4 GB RAM, 50 GB SSD): ~35 €/mes.
-  - Compute contenedores (AWS ECS Fargate para Productor, Consumidor y FastAPI): ~25 €/mes.
-  - Hosting frontend (Netlify Pro con dominio custom): ~18 €/mes.
-  - Tráfico de salida de red (Egress 50 GB/mes): ~4 €/mes.
-  - **Coste total estimado en producción:** **~162 € / mes**.
+### 7.4. Desglose Completo de Costes (6 Partidas Obligatorias)
 
-### 7.5. Propuestas de Mejora y Escalabilidad
-1. **Particionado de tablas por rango temporal (`PARTITION BY RANGE (time_utc)`):**
-   Implementar particiones mensuales automatizadas con la extensión `pg_partman`. Permite poda de particiones (*partition pruning*) en las consultas de las últimas 24h, manteniendo el tiempo de respuesta constante sin importar el histórico.
-2. **Vistas Materializadas con Refresco Incremental:**
-   Precalcular las agregaciones estadísticas de los meses pasados en vistas materializadas inmutables, para que la API responda en $O(1)$.
-3. **Escalado Horizontal de Kafka con Particiones:**
-   Dividir el topic `terremotos.live` en 4 o más particiones con clave `event_id`, permitiendo ejecutar múltiples consumidores concurrentes en grupo de consumo sin peligro de desordenar las versiones de un mismo sismo.
+Una cuota cloud gratuita (*free tier*) **no equivale a coste total cero**: existe coste de amortización de equipo, energía eléctrica, almacenamiento, red, mantenimiento operativo y horas de ingeniería.
+
+| Partida de Coste | Entorno Local Docente (Real) | Despliegue Cloud 24/7 Equivalente | Supuestos y Cálculo Detallado |
+|---|---|---|---|
+| **1. Hardware (Amortización)** | **~6,94 € / mes** (imputado al uso) | **~140 € / mes** (RDS `db.t4g.medium` 35 € + MSK/Kafka 80 € + ECS Fargate 25 €) | Portátil de 1.000 € amortizado en 36 meses (27,78 €/mes) dedicado un 25 % del tiempo al proyecto. |
+| **2. Electricidad** | **~0,72 € / mes** (8 h/día) o **~2,16 € / mes** (24/7) | Incluida en tarifa del proveedor cloud | Consumo adicional medio bajo carga de contenedores de ~25 W $\times$ 8 h/día $\times$ 30 días = 6 kWh/mes a 0,12 €/kWh (o 18 kWh/mes a 24/7). |
+| **3. Almacenamiento** | **< 0,05 € / mes** (~150 MB en SSD local) | **~6,00 € / mes** (50 GB SSD gp3 en RDS + snapshots S3) | 18.592 eventos en PostgreSQL + snapshots `.geojson.gz` con retención de 6 h + retención Kafka 24 h ocupan < 150 MB reales. |
+| **4. Transferencia de Red** | **0 € adicionales** (fibra doméstica existente; ~480 MB/mes) | **~22,00 € / mes** (Netlify Pro 18 € + ~50 GB egress a 0,08 €/GB = 4 €) | El productor descarga `all_day.geojson` (~110 KB) 1.440 veces/día $\approx$ 158 MB/día (~4,7 GB/mes sin compresión, ~480 MB/mes con gzip). |
+| **5. Mantenimiento Operativo** | **~60 € / mes** (2 h/mes de supervisión) | **~120 € / mes** (4 h/mes: parches, rotación de secretos, alertas) | Valorando la hora técnica junior/semi-senior a 30 €/h para vigilar cambios en el esquema USGS, caducidad de túneles y backups. |
+| **6. Tiempo de Desarrollo (Inversión inicial CAPEX)** | **~1.350 €** (45 h $\times$ 30 €/h) | **~1.350 €** (misma base de ingeniería) | 45 horas de ingeniería: diseño del modelo e índices (6 h), productor/consumidor Kafka + STRtree (12 h), carga histórica 2025 (5 h), API FastAPI (7 h), panel Angular + Leaflet (9 h), pruebas y documentación (6 h). |
+| **TOTAL MENSUAL (OPEX)** | **~67,71 € / mes** (+ 1.350 € CAPEX) | **~288,00 € / mes** (+ 1.350 € CAPEX) | Demuestra por qué el coste real nunca es cero aunque se usen planes gratuitos de Netlify y ngrok. |
+
+### 7.5. Propuestas de Escalado y Mejora
+1. **Particionado declarativo por rango temporal (`PARTITION BY RANGE (time_utc)`):** Con `pg_partman` creando particiones mensuales, las consultas de las últimas 24 h aplican *partition pruning* y leen únicamente la partición activa, manteniendo tiempos $< 5\text{ ms}$ incluso con 100 millones de registros históricos.
+2. **Índice compuesto `(mode, time_utc DESC)` y Vistas Materializadas:** Para que `/api/estadisticas` sobre el histórico anual responda en $O(1)$ sin recalcular agregaciones de meses ya cerrados.
+3. **Escalado horizontal del consumidor con múltiples particiones en Kafka:** Como la clave del mensaje es `event_id`, aumentar a $K$ particiones garantiza que todas las revisiones de un mismo terremoto vayan siempre a la misma partición y se procesen en orden por un grupo de $K$ consumidores en paralelo.
 
 ---
 
 ## 8. Evidencias de Pruebas de Aceptación (ENUNCIADO.md §11)
 
-Las pruebas fueron ejecutadas con el script [`test_aceptacion.py`](file:///c:/Users/marqu/Desktop/IABD/BD/observatorio-sismico-materiales/observatorio-sismico/backend/tests/test_aceptacion.py) y verificadas en PostgreSQL:
+Las 11 pruebas del enunciado fueron verificadas con [`backend/tests/test_aceptacion.py`](file:///c:/Users/marqu/Desktop/IABD/BD/observatorio-sismico-materiales/observatorio-sismico/backend/tests/test_aceptacion.py) (etiquetando los casos sintéticos con `mode = 'test'` para mantenerlos separados del análisis real) y con [`scripts/prueba_08_reinicio_consumidor.ps1`](file:///c:/Users/marqu/Desktop/IABD/BD/observatorio-sismico-materiales/observatorio-sismico/scripts/prueba_08_reinicio_consumidor.ps1):
 
 | ID | Prueba de Aceptación | Resultado Esperado | Resultado Observado en el Sistema | Evidencia Técnica |
 |---|---|---|---|---|
-| **P1** | **Recibir un evento nuevo** | 1 nueva fila en `evento_actual`, reflejada en API y BD. | Recuento aumentó de 3.001 a 3.002. Fila insertada con `country_id = 'CHL'`. | `SELECT COUNT(*) FROM evento_actual` $\rightarrow$ 3.002 filas. |
-| **P2** | **Reenviar la misma versión (Duplicado idéntico)** | No aumenta el número de terremotos. | Mismo ID y updated. El recuento permaneció en 3.002. Versiones totales: 1. | Consulta SQL confirmó 0 filas añadidas. Idempotencia verificada. |
-| **P3** | **Recibir versión posterior (Revisión)** | Se actualizan los datos vigentes y aumenta el historial. | Magnitud se actualizó a 5.80 y profundidad a 18.00 km. `evento_version` subió a 2 filas. | `SELECT mag, depth_km FROM evento_actual WHERE event_id = 'test-nuevo'` $\rightarrow$ 5.80, 18.00. |
-| **P4** | **Recibir versión antigua recibida tarde** | No degrada ni sobrescribe la versión más moderna. | Magnitud se mantuvo en 5.80 (no cambió a 4.0). Se registró la 3ª versión inmutable. | `evento_actual.mag = 5.80` intacto; `evento_version` contiene 3 versiones auditadas. |
-| **P5** | **Magnitud nula (`mag = null`)** | Se conserva con tratamiento documentado (visualizado como ND). | Registro insertado en BD con `mag = NULL`. | `SELECT mag FROM evento_actual WHERE event_id = 'test-magnull'` $\rightarrow$ `NULL`. |
-| **P6** | **Coordenadas inválidas a cuarentena** | Registro aislado en cuarentena; no aparece en mapa ni en tabla actual. | Coordenadas `[999.0, 999.0]`. Desviado inmediatamente a `cuarentena`. `evento_actual` = 0. | `SELECT reason FROM cuarentena WHERE event_id = 'test-badcoord'` $\rightarrow$ `"Coordenadas fuera de rango"`. |
-| **P7** | **Evento marítimo (aguas abiertas)** | Sin país asignado (`country_id = null`); permanece en el análisis. | Sismo en medio del Pacífico `[-150.0, -30.0]`. Insertado con `country_id = NULL`. | `SELECT country_id FROM evento_actual WHERE event_id = 'test-oceano'` $\rightarrow$ `NULL`. |
-| **P8** | **Reinicio del consumidor** | Reanuda el streaming sin duplicar los efectos ya persistidos. | Se ejecutó `docker restart observatorio-consumer`. Los offsets confirmados evitaron reprocesar. | Recuento pre y post reinicio consistente (3.005 eventos). |
-| **P9** | **Cierre del túnel ngrok** | El frontend muestra el error de red y mantiene la última lectura. | `docker stop observatorio-ngrok`. ngrok devolvió HTTP 404 (`ERR_NGROK_3200`). | Banner `⚠️ Desconexión de API / Túnel` visible en interfaz sin roturas. |
-| **P10** | **Reapertura del túnel ngrok** | Recuperación automática de las consultas periódicas. | `docker start observatorio-ngrok`. API respondió HTTP 200 en 8 segundos. | Sincronización restablecida automáticamente sin refrescar la página. |
-| **P11** | **Reproducción histórica (Replay)** | Procesamiento acelerado por Kafka aislado con etiqueta `mode='replay'`. | Mensajes emitidos al topic `terremotos.replay`. Insertados en BD con `mode = 'replay'`. | `SELECT mode FROM evento_actual WHERE event_id = 'test-replay'` $\rightarrow$ `'replay'`. |
+| **P1** | **Recibir un evento nuevo** | 1 nueva fila en `evento_actual`, visible en API, mapa y análisis. | Recuento pasó de `18.586` a `18.587`. Fila insertada con `mag = 5,20` y `country_id = 'CHL'`. Verificado por HTTP en `GET /api/eventos?mode=test`. | `Visible en API: SÍ`, `evento_version = 1`. |
+| **P2** | **Reenviar la misma versión (Duplicado idéntico)** | No aumenta el número de terremotos. | Reenviado con igual `(event_id, updated)`. El recuento permaneció en `18.587` y `evento_version` en `1`. | `ON CONFLICT DO NOTHING` + `WHERE EXCLUDED.updated_utc > evento_actual.updated_utc`. |
+| **P3** | **Recibir versión posterior (Revisión)** | Cambian los datos actuales y las agregaciones afectadas. | `evento_actual.mag` subió de `5,20` a `5,80`, `depth_km` a `18,00 km`, `evento_version = 2`. `GET /api/eventos` devolvió `mag = 5,8`. | Las agregaciones se calculan desde `evento_actual`, reflejando el cambio al instante. |
+| **P4** | **Recibir después una versión antigua** | No sustituye a la más reciente. | Enviado `updated` anterior con `mag = 4,0`. `evento_actual.mag` permaneció en `5,80`; `evento_version` guardó las `3` versiones para auditoría. | Protección frente a desorden en red verificada. |
+| **P5** | **Magnitud nula (`mag = null`)** | Se conserva con tratamiento documentado y se visualiza como `ND`. | Insertado en BD con `mag IS NULL`, contabilizado en `total_magnitud_nula` y mostrado como `ND` en mapa, gráficos y tabla. | `evento_actual.mag = None (NULL conservado)`. |
+| **P6** | **Coordenadas inválidas a cuarentena** | Cuarentena y motivo; no aparecen puntos inventados. | Coordenadas `[999.0, 999.0]` desviadas a tabla `cuarentena` (`0` filas en `evento_actual`). | `reason = 'Coordenadas fuera de rango geografico: lon=999.0, lat=999.0'`. |
+| **P7** | **Evento marítimo** | Sin país asignado; permanece en el análisis. | Punto en el Pacífico Sur `[-150.0, -30.0]` insertado con `country_id = NULL` y devuelto como «Sin país asignado». | No se descarta ni se atribuye al país más cercano. |
+| **P8** | **Reiniciar consumidor** | Reanuda sin duplicar los efectos ya persistidos ni perder mensajes en cola. | Con `prueba_08_reinicio_consumidor.ps1`: se paró el consumidor, se publicó `test-reinicio-92fd55` (en BD = `0`), se arrancó el consumidor y procesó exactamente `1` fila (`18.591` $\rightarrow$ `18.592`). | Commit manual de offset tras `conn.commit()` en PostgreSQL. |
+| **P9** | **Cerrar el túnel ngrok** | El panel muestra el fallo y conserva/identifica la última lectura. | Al detener `ngrok`, el panel activa el banner de desconexión, marca el estado en rojo y conserva los últimos eventos y la hora de última lectura válida. | Resiliencia verificada en `app.component.ts`. |
+| **P10** | **Volver a abrir el túnel ngrok** | Se recuperan las consultas automáticamente. | Al reabrir el túnel, el siguiente ciclo de refresco (60 s) restablece `apiConnected = true` y oculta el aviso sin recargar el navegador. | Recuperación automática comprobada. |
+| **P11** | **Reproducción histórica (`replay`)** | Procesa por Kafka sin mezclarla con datos `live`. | Publicado en topic `terremotos.replay` y persistido con `mode = 'replay'`, visible bajo el banner `⚡ MODO REPRODUCCIÓN HISTÓRICA ACTIVO`. | Aislamiento completo por topic y columna `mode`. |
 
 ---
 

@@ -9,11 +9,17 @@ import sys
 import tracemalloc
 from datetime import datetime, timezone
 
+import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-PG = dict(host="localhost", port=5432, dbname="observatorio",
-          user="observatorio", password="observatorio_secret_pw")
+PG = dict(
+    host=os.getenv("POSTGRES_HOST", "localhost"),
+    port=int(os.getenv("POSTGRES_PORT", "5432")),
+    dbname=os.getenv("POSTGRES_DB", "observatorio"),
+    user=os.getenv("POSTGRES_USER", "observatorio"),
+    password=os.getenv("POSTGRES_PASSWORD", "observatorio_secret_pw")
+)
 
 def conn():
     return psycopg2.connect(**PG, cursor_factory=RealDictCursor)

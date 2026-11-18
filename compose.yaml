@@ -69,6 +69,7 @@ services:
       KAFKA_TOPIC: ${KAFKA_TOPIC:-terremotos.live}
       USGS_FEED_URL: ${USGS_FEED_URL:-https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson}
       INGESTION_INTERVAL_SECONDS: ${INGESTION_INTERVAL_SECONDS:-60}
+      SNAPSHOT_RETENTION_HOURS: ${SNAPSHOT_RETENTION_HOURS:-6}
     depends_on:
       kafka:
         condition: service_healthy
@@ -77,6 +78,13 @@ services:
       - ./datos/historico:/app/datos/historico
     networks:
       - observatorio-net
+    healthcheck:
+      # Sano si el bucle de ingesta completó un ciclo (aunque USGS fallara) en los últimos 180 s
+      test: ["CMD-SHELL", "python -c \"import os,sys,time; p='/tmp/producer_heartbeat'; sys.exit(0 if os.path.exists(p) and time.time()-os.path.getmtime(p)<180 else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
 
   # 4. Consumidor Python (aiokafka + PostgreSQL)
   consumer:
@@ -103,6 +111,13 @@ services:
       - ./datos/historico:/app/datos/historico
     networks:
       - observatorio-net
+    healthcheck:
+      # Sano si el consumidor conectó con Kafka y PostgreSQL (crea el latido al arrancar)
+      test: ["CMD-SHELL", "python -c \"import os,sys; sys.exit(0 if os.path.exists('/tmp/consumer_heartbeat') else 1)\""]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   # 5. API FastAPI (Uvicorn escuchando en 0.0.0.0:8000)
   api:

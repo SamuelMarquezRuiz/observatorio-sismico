@@ -65,6 +65,7 @@ export interface EstadisticasResponse {
   metadata?: {
     generated?: number;
     mode?: string;
+    temporal_granularity?: 'hour' | 'day';
   };
   total_eventos: number;
   resumen_metricas?: {
@@ -117,7 +118,7 @@ export class AppComponent implements OnDestroy {
   readonly countriesStatus = signal('Cargando catálogo');
 
   // Filtros interactivos
-  readonly selectedMode = signal<'live' | 'replay'>('live');
+  readonly selectedMode = signal<'live' | 'replay' | 'historical'>('live');
   readonly minMagFilter = signal<string>('');
   readonly countryFilter = signal<string>('');
   readonly startDateFilter = signal<string>('');
@@ -150,6 +151,126 @@ export class AppComponent implements OnDestroy {
     return Math.max(1, ...windows.map(w => w.count));
   });
 
+  // Selector mensual y desglose diario completo (sin scroll horizontal)
+  private readonly MESES_ES = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+
+  readonly selectedChartMonth = signal<string>('');
+
+  readonly isDailyChartMode = computed(() => {
+    return this.estadisticas()?.metadata?.temporal_granularity === 'day';
+  });
+
+  readonly availableMonths = computed(() => {
+    const windows = this.estadisticas()?.por_ventana_hora ?? [];
+    const monthsSet = new Set<string>();
+    for (const w of windows) {
+      if (w.hora_utc && w.hora_utc.length >= 7) {
+        monthsSet.add(w.hora_utc.substring(0, 7));
+      }
+    }
+    if (monthsSet.size === 0) {
+      for (const ev of this.eventosList()) {
+        if (ev.properties?.time) {
+          monthsSet.add(new Date(ev.properties.time).toISOString().substring(0, 7));
+        }
+      }
+    }
+    return Array.from(monthsSet).sort().map(ym => {
+      const [year, monthStr] = ym.split('-');
+      const monthIdx = parseInt(monthStr, 10) - 1;
+      return {
+        value: ym,
+        label: `${this.MESES_ES[monthIdx] ?? monthStr} ${year}`
+      };
+    });
+  });
+
+  readonly activeChartMonth = computed(() => {
+    const current = this.selectedChartMonth();
+    const avail = this.availableMonths();
+    if (avail.length === 0) return '';
+    if (current && avail.some(m => m.value === current)) {
+      return current;
+    }
+    return avail[0].value;
+  });
+
+  readonly dailyChartData = computed(() => {
+    const ym = this.activeChartMonth();
+    if (!ym) return [];
+    const [yearStr, monthStr] = ym.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10);
+    const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+    const countsByDay = new Map<string, number>();
+    for (const w of this.estadisticas()?.por_ventana_hora ?? []) {
+      if (w.hora_utc && w.hora_utc.startsWith(ym)) {
+        const dayKey = w.hora_utc.substring(0, 10);
+        countsByDay.set(dayKey, (countsByDay.get(dayKey) ?? 0) + w.count);
+      }
+    }
+
+    const result: Array<{ date: string; dayLabel: string; count: number }> = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dayPadded = String(d).padStart(2, '0');
+      const dateKey = `${ym}-${dayPadded}`;
+      result.push({
+        date: dateKey,
+        dayLabel: dayPadded,
+        count: countsByDay.get(dateKey) ?? 0
+      });
+    }
+    return result;
+  });
+
+  readonly maxDailyCount = computed(() => {
+    const days = this.dailyChartData();
+    if (days.length === 0) return 1;
+    return Math.max(1, ...days.map(d => d.count));
+  });
+
+  readonly monthlyTotalEvents = computed(() => {
+    return this.dailyChartData().reduce((acc, d) => acc + d.count, 0);
+  });
+
+  // Auto-refresco (30s) y seguimiento de nuevos eventos en streaming
+  readonly autoRefreshEnabled = signal(true);
+  readonly newEventIds = signal<Set<string>>(new Set());
+
+  // Evento destacado (mayor magnitud) de la selección actual
+  readonly featuredEvent = computed<EarthquakeFeature | null>(() => {
+    const list = this.eventosList();
+    let best: EarthquakeFeature | null = null;
+    let bestMag = -Infinity;
+    for (const ev of list) {
+      const m = ev.properties?.mag;
+      if (typeof m === 'number' && Number.isFinite(m) && m > bestMag) {
+        bestMag = m;
+        best = ev;
+      }
+    }
+    return best;
+  });
+
+  // Top 5 regiones/países con mayor actividad sísmica calculado dinámicamente
+  readonly topRegions = computed(() => {
+    const list = this.eventosList();
+    if (list.length === 0) return [];
+    const counts = new Map<string, number>();
+    for (const ev of list) {
+      const region = ev.properties?.country_name || 'Sin país asignado';
+      counts.set(region, (counts.get(region) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  });
+
   // Configuración de mapa
   readonly options: L.MapOptions = {
     center: L.latLng(18, 0),
@@ -162,6 +283,9 @@ export class AppComponent implements OnDestroy {
 
   private map?: L.Map;
   private eventsLayer = L.layerGroup();
+  private markerMap = new Map<string, L.CircleMarker>();
+  private knownEventIds = new Set<string>();
+  private hasLoadedOnce = false;
   private timer?: ReturnType<typeof setTimeout>;
   private controller = new AbortController();
   private destroyed = false;
@@ -169,14 +293,45 @@ export class AppComponent implements OnDestroy {
 
   async onMapReady(map: L.Map): Promise<void> {
     this.map = map;
-    const base = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+
+    const esriDark = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 16,
+      noWrap: true,
+      attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
+    }).addTo(map);
+
+    const esriOcean = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 13,
+      noWrap: true,
+      attribution: 'Tiles &copy; Esri &mdash; Sources: GEBCO, NOAA, CHS, OSU, UNH, CSUMB, National Geographic, DeLorme, and others'
+    });
+
+    const esriPhysical = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Physical_Map/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 8,
+      noWrap: true,
+      attribution: 'Tiles &copy; Esri &mdash; Source: US National Park Service'
+    });
+
+    const openTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+      maxZoom: 17,
+      noWrap: true,
+      attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+    });
+
+    const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19,
+      noWrap: true,
+      attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    });
+
+    const osmStandard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       noWrap: true,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
+    });
 
     const borders = L.geoJSON(undefined, {
-      style: { color: '#334155', weight: 1, fill: false },
+      style: { color: '#475569', weight: 1, fill: false },
       onEachFeature: (feature, layer) => {
         const name = document.createElement('span');
         name.textContent = feature.properties?.NAME_ES ?? feature.properties?.ADMIN ?? 'Sin nombre';
@@ -184,9 +339,29 @@ export class AppComponent implements OnDestroy {
       }
     }).addTo(map);
 
+    const tectonicPlates = L.geoJSON(undefined, {
+      style: { color: '#f97316', weight: 1.5, opacity: 0.6, dashArray: '4 4' }
+    }).addTo(map);
+
     this.eventsLayer.addTo(map);
-    L.control.layers({ 'OpenStreetMap': base }, { 'Países (Natural Earth)': borders, 'Terremotos': this.eventsLayer }).addTo(map);
-    map.attributionControl.addAttribution('Fronteras: Natural Earth · Datos reales: USGS');
+
+    const baseMaps: Record<string, L.TileLayer> = {
+      'Modo Oscuro (Esri)': esriDark,
+      'Océanos y Batimetría (Esri)': esriOcean,
+      'Relieve Físico (Esri)': esriPhysical,
+      'Topográfico (OpenTopoMap)': openTopo,
+      'Vista Satélite (Esri)': esriSat,
+      'Mapa Estándar (OSM)': osmStandard
+    };
+
+    const overlayMaps: Record<string, L.Layer> = {
+      'Placas Tectónicas (PB2002)': tectonicPlates,
+      'Fronteras (Natural Earth)': borders,
+      'Terremotos': this.eventsLayer
+    };
+
+    L.control.layers(baseMaps, overlayMaps, { position: 'topright' }).addTo(map);
+    map.attributionControl.addAttribution('Fronteras: Natural Earth · Placas: PB2002 · Datos reales: USGS');
 
     // Cargar polígonos de países locales
     try {
@@ -195,6 +370,17 @@ export class AppComponent implements OnDestroy {
     } catch {
       this.countriesStatus.set('No se pudo cargar el catálogo de países');
     }
+
+    // Cargar límites de placas tectónicas en segundo plano (capa opcional)
+    void this.readJson<FeatureCollection>(
+      'https://raw.githubusercontent.com/fraxen/tectonicplates/master/GeoJSON/PB2002_boundaries.json'
+    ).then(plates => {
+      if (!this.destroyed) {
+        tectonicPlates.addData(plates);
+      }
+    }).catch(() => {
+      // Silencioso si no hay conexión externa
+    });
 
     if (this.destroyed) return;
 
@@ -256,15 +442,18 @@ export class AppComponent implements OnDestroy {
         this.apiConnected.set(false);
       }
 
-      // 2. Construir query string de filtros
+      // 2. Construir query string de filtros sin truncamientos artificiales
       const params = new URLSearchParams();
       params.set('mode', this.selectedMode());
       if (this.minMagFilter()) params.set('min_mag', this.minMagFilter());
       if (this.countryFilter()) params.set('country_id', this.countryFilter());
-      if (this.startDateFilter()) params.set('start', new Date(this.startDateFilter()).toISOString());
-      if (this.endDateFilter()) params.set('end', new Date(this.endDateFilter()).toISOString());
+      if (this.startDateFilter()) params.set('start', `${this.startDateFilter()}T00:00:00.000Z`);
+      if (this.endDateFilter()) params.set('end', `${this.endDateFilter()}T23:59:59.999Z`);
 
-      const urlEventos = `${baseApi}/api/eventos?${params.toString()}`;
+      const eventParams = new URLSearchParams(params);
+      eventParams.set('limit', '25000');
+
+      const urlEventos = `${baseApi}/api/eventos?${eventParams.toString()}`;
       const urlEstadisticas = `${baseApi}/api/estadisticas?${params.toString()}`;
 
       // 3. Consultar eventos y estadísticas en paralelo
@@ -277,9 +466,34 @@ export class AppComponent implements OnDestroy {
 
       this.isReplayMode.set(this.selectedMode() === 'replay');
       this.apiConnected.set(true);
-      this.status.set(this.selectedMode() === 'replay' ? 'MODO REPRODUCCIÓN HISTÓRICA' : 'API conectada · datos en streaming');
+      this.status.set(
+        this.selectedMode() === 'replay'
+          ? 'MODO REPRODUCCIÓN HISTÓRICA'
+          : this.selectedMode() === 'historical'
+            ? 'CATÁLOGO HISTÓRICO 2025 · datos consolidados'
+            : 'API conectada · datos en streaming'
+      );
 
       if (dataEventos && Array.isArray(dataEventos.features)) {
+        // Detectar eventos recién llegados en streaming (después de la carga inicial)
+        if (this.selectedMode() === 'live') {
+          if (this.hasLoadedOnce) {
+            const newlyArrived = new Set<string>();
+            for (const f of dataEventos.features) {
+              if (!this.knownEventIds.has(f.id)) {
+                newlyArrived.add(f.id);
+              }
+            }
+            this.newEventIds.set(newlyArrived);
+          } else {
+            this.newEventIds.set(new Set());
+          }
+          this.knownEventIds = new Set(dataEventos.features.map(f => f.id));
+          this.hasLoadedOnce = true;
+        } else {
+          this.newEventIds.set(new Set());
+        }
+
         this.renderEvents(dataEventos.features);
         this.eventosList.set(dataEventos.features);
         this.currentPage.set(1);
@@ -300,11 +514,12 @@ export class AppComponent implements OnDestroy {
         this.status.set('No se pudo conectar a la API: se conservan los datos previos. Revisa túnel ngrok y CORS.');
       }
     } finally {
-      if (!this.destroyed && cfg.mode === 'api') {
-        clearTimeout(this.timer);
+      clearTimeout(this.timer);
+      if (!this.destroyed && cfg.mode === 'api' && this.selectedMode() !== 'historical' && this.autoRefreshEnabled()) {
+        // El enunciado fija 60 s: evita refrescos innecesarios (cuotas de ngrok/Netlify)
         this.timer = setTimeout(
           () => void this.refresh(cfg),
-          Math.max(30000, Number(cfg.refreshMs) || 60000)
+          Math.max(60000, Number(cfg.refreshMs) || 60000)
         );
       }
     }
@@ -325,6 +540,7 @@ export class AppComponent implements OnDestroy {
 
   private renderEvents(features: EarthquakeFeature[]): void {
     const next = L.layerGroup();
+    this.markerMap.clear();
     let omitted = 0;
     let count = 0;
 
@@ -353,7 +569,7 @@ export class AppComponent implements OnDestroy {
         <b>ID:</b> <code>${this.escapeHtml(feature.id)}</code>
       `;
 
-      L.circleMarker([lat, lon], {
+      const marker = L.circleMarker([lat, lon], {
         radius: magnitude === null ? 4 : Math.max(4, Math.min(22, 3 + (magnitude + 1) * 2.2)),
         color,
         fillColor: color,
@@ -361,6 +577,7 @@ export class AppComponent implements OnDestroy {
         weight: 1
       }).bindPopup(popup).addTo(next);
 
+      this.markerMap.set(feature.id, marker);
       count++;
     }
 
@@ -370,10 +587,76 @@ export class AppComponent implements OnDestroy {
     this.omitted.set(omitted);
   }
 
+  // Interactividad Mapa <-> Tabla y utilidades
+  focusOnEvent(ev: EarthquakeFeature): void {
+    const c = ev.geometry?.coordinates;
+    if (!c || c.length < 2) return;
+    const [lon, lat] = c;
+    if (!Number.isFinite(lon) || !Number.isFinite(lat)) return;
+
+    document.getElementById('map-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    this.map?.flyTo([lat, lon], 6, { duration: 1.0 });
+
+    const marker = this.markerMap.get(ev.id);
+    if (marker) {
+      setTimeout(() => {
+        marker.openPopup();
+      }, 450);
+    }
+  }
+
+  exportCsv(): void {
+    const list = this.eventosList();
+    if (list.length === 0) return;
+
+    const escapeCsv = (val: unknown): string => {
+      const str = val === null || val === undefined ? '' : String(val);
+      return `"${str.replace(/"/g, '""')}"`;
+    };
+
+    const headers = ['event_id', 'fecha_utc', 'magnitud', 'tipo_magnitud', 'profundidad_km', 'latitud', 'longitud', 'pais', 'ubicacion'];
+    const rows = list.map(ev => {
+      const p = ev.properties;
+      const [lon, lat, depth] = ev.geometry.coordinates;
+      return [
+        escapeCsv(ev.id),
+        escapeCsv(this.formatDate(p.time)),
+        escapeCsv(p.mag ?? 'ND'),
+        escapeCsv(p.magType ?? ''),
+        escapeCsv(depth ?? 'ND'),
+        escapeCsv(lat),
+        escapeCsv(lon),
+        escapeCsv(p.country_name ?? 'Sin país asignado'),
+        escapeCsv(p.place ?? '')
+      ].join(',');
+    });
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `terremotos-${this.selectedMode()}-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  toggleAutoRefresh(): void {
+    const nextState = !this.autoRefreshEnabled();
+    this.autoRefreshEnabled.set(nextState);
+    clearTimeout(this.timer);
+    if (nextState && this.selectedMode() !== 'historical' && this.currentConfig) {
+      this.timer = setTimeout(() => void this.refresh(this.currentConfig), 60000);
+    }
+  }
+
   // Métodos de control de filtros
   onModeChange(event: Event): void {
-    const val = (event.target as HTMLSelectElement).value as 'live' | 'replay';
+    const val = (event.target as HTMLSelectElement).value as 'live' | 'replay' | 'historical';
     this.selectedMode.set(val);
+    this.hasLoadedOnce = false;
+    this.knownEventIds.clear();
+    this.newEventIds.set(new Set());
     this.refresh();
   }
 
@@ -391,6 +674,10 @@ export class AppComponent implements OnDestroy {
 
   onEndDateChange(event: Event): void {
     this.endDateFilter.set((event.target as HTMLInputElement).value);
+  }
+
+  onChartMonthChange(event: Event): void {
+    this.selectedChartMonth.set((event.target as HTMLSelectElement).value);
   }
 
   applyFilters(): void {
@@ -428,6 +715,15 @@ export class AppComponent implements OnDestroy {
 
   formatHour(iso: string): string {
     if (!iso) return '';
+    return iso.substring(11, 16);
+  }
+
+  formatWindowLabel(iso: string, granularity?: string): string {
+    if (!iso) return '';
+    if (granularity === 'day') {
+      // YYYY-MM-DD -> DD/MM
+      return `${iso.substring(8, 10)}/${iso.substring(5, 7)}`;
+    }
     return iso.substring(11, 16);
   }
 

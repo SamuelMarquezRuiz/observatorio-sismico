@@ -110,15 +110,37 @@ EVENTOS_CONTROLADOS_PRUEBA = [
     }
 ]
 
-def cargar_muestra_historica(limite: int = 15) -> List[Dict[str, Any]]:
-    """Carga eventos reales de los archivos históricos descargados si existen."""
-    candidatos = [
+def cargar_muestra_historica(limite: int = 15, archivo_especifico: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Carga eventos reales de los archivos históricos descargados o query.json si existen."""
+    if archivo_especifico:
+        p = Path(archivo_especifico)
+        if not p.is_absolute():
+            posibles = [Path.cwd() / p, current_dir.parent.parent / p, Path("/app") / p]
+            for pos in posibles:
+                if pos.exists():
+                    p = pos
+                    break
+        if p.exists():
+            try:
+                with open(p, "r", encoding="utf-8") as fp:
+                    data = json.load(fp)
+                    features = data.get("features", [])
+                    if features:
+                        logger.info(f"Cargada muestra histórica desde archivo especificado: {p.name} ({len(features)} disponibles)")
+                        return features[:limite]
+            except Exception as e:
+                logger.warning(f"No se pudo leer {p}: {e}")
+
+    candidatos_dir = [
         Path("/app/datos/historico"),
-        current_dir.parent.parent / "datos" / "historico"
+        current_dir.parent.parent / "datos" / "historico",
+        Path("/app"),
+        current_dir.parent.parent
     ]
-    for d in candidatos:
+    for d in candidatos_dir:
         if d.exists():
-            for f in sorted(d.glob("*.geojson")):
+            archivos = sorted(list(d.glob("*.geojson"))) + sorted(list(d.glob("query.json")))
+            for f in archivos:
                 try:
                     with open(f, "r", encoding="utf-8") as fp:
                         data = json.load(fp)
@@ -130,7 +152,7 @@ def cargar_muestra_historica(limite: int = 15) -> List[Dict[str, Any]]:
                     logger.warning(f"No se pudo leer {f}: {e}")
     return []
 
-async def ejecutar_replay(delay: float, incluir_faq_q12: bool, count: int):
+async def ejecutar_replay(delay: float, incluir_faq_q12: bool, count: int, archivo_especifico: Optional[str] = None):
     topic = KAFKA_REPLAY_TOPIC or "terremotos.replay"
     logger.info("=== INICIANDO REPRODUCCIÓN HISTÓRICA ACELERADA ===")
     logger.info(f"Destino Kafka: {KAFKA_BOOTSTRAP_SERVERS} | Topic: {topic}")
@@ -146,7 +168,7 @@ async def ejecutar_replay(delay: float, incluir_faq_q12: bool, count: int):
             logger.info("Añadiendo casos de prueba controlados de la FAQ Q12 (duplicados, revisiones y cuarentena).")
             eventos_a_enviar.extend(EVENTOS_CONTROLADOS_PRUEBA)
 
-        muestra_real = cargar_muestra_historica(limite=count)
+        muestra_real = cargar_muestra_historica(limite=count, archivo_especifico=archivo_especifico)
         if muestra_real:
             eventos_a_enviar.extend(muestra_real)
         else:
@@ -194,6 +216,7 @@ async def ejecutar_replay(delay: float, incluir_faq_q12: bool, count: int):
 
 def main():
     parser = argparse.ArgumentParser(description="Productor de reproducción acelerada (Replay).")
+    parser.add_argument("--archivo", "-f", type=str, default=None, help="Archivo GeoJSON específico (ej: query.json) para replay.")
     parser.add_argument("--delay", type=float, default=1.5, help="Segundos entre eventos (default: 1.5s).")
     parser.add_argument("--count", type=int, default=15, help="Número de eventos históricos reales a emitir.")
     parser.add_argument("--sin-faq-q12", action="store_true", help="Omitir casos sintéticos de FAQ Q12.")
@@ -202,7 +225,8 @@ def main():
     asyncio.run(ejecutar_replay(
         delay=args.delay,
         incluir_faq_q12=not args.sin_faq_q12,
-        count=args.count
+        count=args.count,
+        archivo_especifico=args.archivo
     ))
 
 if __name__ == "__main__":
