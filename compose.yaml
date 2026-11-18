@@ -1,0 +1,165 @@
+name: observatorio-sismico
+
+services:
+  # 1. Broker Kafka (Apache Kafka con KRaft)
+  kafka:
+    image: apache/kafka:3.8.0
+    container_name: observatorio-kafka
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:29092:29092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG_RETENTION_HOURS: 24
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - observatorio-net
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+
+  # 2. Almacenamiento PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: observatorio-postgres
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-observatorio}
+      POSTGRES_USER: ${POSTGRES_USER:-observatorio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-observatorio_secret_pw}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - observatorio-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-observatorio} -d ${POSTGRES_DB:-observatorio}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # 3. Productor Python (aiokafka)
+  producer:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: observatorio-producer
+    restart: unless-stopped
+    command: ["python", "-m", "producer.main"]
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-terremotos.live}
+      USGS_FEED_URL: ${USGS_FEED_URL:-https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson}
+      INGESTION_INTERVAL_SECONDS: ${INGESTION_INTERVAL_SECONDS:-60}
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - producer_data:/app/data
+      - ./datos/historico:/app/datos/historico
+    networks:
+      - observatorio-net
+
+  # 4. Consumidor Python (aiokafka + PostgreSQL)
+  consumer:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: observatorio-consumer
+    restart: unless-stopped
+    command: ["python", "-m", "consumer.main"]
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-terremotos.live}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-observatorio}
+      POSTGRES_USER: ${POSTGRES_USER:-observatorio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-observatorio_secret_pw}
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./datos/historico:/app/datos/historico
+    networks:
+      - observatorio-net
+
+  # 5. API FastAPI (Uvicorn escuchando en 0.0.0.0:8000)
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: observatorio-api
+    restart: unless-stopped
+    command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-observatorio}
+      POSTGRES_USER: ${POSTGRES_USER:-observatorio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-observatorio_secret_pw}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:4200,http://127.0.0.1:4200}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - observatorio-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/salud || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # 6. Túnel ngrok (Opcional en contenedor con perfil 'tunnel')
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: observatorio-ngrok
+    restart: unless-stopped
+    command: ["http", "http://api:8000"]
+    ports:
+      - "127.0.0.1:4040:4040"
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - observatorio-net
+    profiles:
+      - tunnel
+
+volumes:
+  kafka_data:
+    name: observatorio_kafka_data
+  postgres_data:
+    name: observatorio_postgres_data
+  producer_data:
+    name: observatorio_producer_data
+
+networks:
+  observatorio-net:
+    name: observatorio-net
+    driver: bridge

@@ -1,0 +1,317 @@
+<main>
+  <!-- Cabecera del Observatorio -->
+  <header>
+    <p class="eyebrow">BIG DATA · SISTEMAS DISTRIBUIDOS · IABD</p>
+    <h1>Observatorio de Actividad Sísmica</h1>
+    <p class="subtitle">Monitorización en streaming con Apache Kafka, PostgreSQL, FastAPI y Leaflet.</p>
+  </header>
+
+  <!-- Banners de Alerta de Estado -->
+  @if (!apiConnected()) {
+    <div class="alert alert-danger" role="alert">
+      <strong>⚠️ Desconexión de API / Túnel:</strong> No se pudo conectar con el backend.
+      Se conservan los datos de la última lectura exitosa en caché local. Verifica que Docker y el túnel ngrok estén activos.
+    </div>
+  }
+
+  @if (isReplayMode()) {
+    <div class="alert alert-warning" role="alert">
+      <strong>⚡ MODO REPRODUCCIÓN HISTÓRICA ACTIVO:</strong> Se están reproduciendo sismos históricos por Kafka a velocidad acelerada.
+      Los datos observados corresponden a demostración de flujo y no representan sismicidad en tiempo real.
+    </div>
+  }
+
+  @if (ingestionAlert() && !isReplayMode()) {
+    <div class="alert alert-info" role="alert">
+      <strong>⏱️ Alerta de Ingesta:</strong> La última consulta exitosa a USGS fue hace más de 3 minutos.
+      Comprueba el estado del servicio <code>producer</code> en Docker.
+    </div>
+  }
+
+  <!-- Barra de Metadatos y Salud del Sistema -->
+  <section class="info-bar" aria-live="polite">
+    <div class="info-card">
+      <span class="info-label">Modo Activo</span>
+      <strong class="info-value">{{ mode() }}</strong>
+    </div>
+    <div class="info-card">
+      <span class="info-label">Estado de Conexión</span>
+      <span class="info-value" [class.text-danger]="!apiConnected()">{{ status() }}</span>
+    </div>
+    <div class="info-card">
+      <span class="info-label">Eventos Dibujados</span>
+      <strong class="info-value">{{ count() }} <small>({{ omitted() }} descartados)</small></strong>
+    </div>
+    <div class="info-card">
+      <span class="info-label">Última Ingesta USGS</span>
+      <span class="info-value">{{ lastIngestion() }}</span>
+    </div>
+    <div class="info-card">
+      <span class="info-label">Último Refresco Panel</span>
+      <span class="info-value">{{ lastRead() }}</span>
+    </div>
+  </section>
+
+  <!-- Panel de Controles y Filtros Interactivos -->
+  <section class="filters-panel" aria-label="Controles de filtrado de terremotos">
+    <h2>Filtros de Exploración</h2>
+    <div class="filters-grid">
+      <!-- Selector de Modo -->
+      <div class="filter-group">
+        <label for="filter-mode">Modo Operativo</label>
+        <select id="filter-mode" [value]="selectedMode()" (change)="onModeChange($event)">
+          <option value="live">🔴 En vivo (Streaming USGS)</option>
+          <option value="replay">⚡ Reproducción Histórica (Replay)</option>
+        </select>
+      </div>
+
+      <!-- Selector de País -->
+      <div class="filter-group">
+        <label for="filter-country">Ámbito Geográfico</label>
+        <select id="filter-country" [value]="countryFilter()" (change)="onCountryChange($event)">
+          <option value="">🌍 Todo el mundo</option>
+          <option value="SIN_PAIS">🌊 Sin país asignado (Océano)</option>
+          @for (p of listaPaises(); track p.country_id) {
+            <option [value]="p.country_id">{{ p.name }} ({{ p.country_id }})</option>
+          }
+        </select>
+      </div>
+
+      <!-- Magnitud Mínima -->
+      <div class="filter-group">
+        <label for="filter-mag">Magnitud Mínima (≥)</label>
+        <input 
+          id="filter-mag" 
+          type="number" 
+          step="0.5" 
+          min="0" 
+          max="10" 
+          placeholder="Ej: 4.0" 
+          [value]="minMagFilter()" 
+          (input)="onMinMagInput($event)">
+      </div>
+
+      <!-- Fecha Inicio -->
+      <div class="filter-group">
+        <label for="filter-start">Fecha Inicio UTC</label>
+        <input 
+          id="filter-start" 
+          type="date" 
+          [value]="startDateFilter()" 
+          (change)="onStartDateChange($event)">
+      </div>
+
+      <!-- Fecha Fin -->
+      <div class="filter-group">
+        <label for="filter-end">Fecha Fin UTC</label>
+        <input 
+          id="filter-end" 
+          type="date" 
+          [value]="endDateFilter()" 
+          (change)="onEndDateChange($event)">
+      </div>
+
+      <!-- Botones de Acción -->
+      <div class="filter-actions">
+        <button type="button" class="btn btn-primary" (click)="applyFilters()">🔍 Aplicar Filtros</button>
+        <button type="button" class="btn btn-secondary" (click)="resetFilters()">↺ Restablecer</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Mapa Cartográfico Leaflet -->
+  <section class="map-container" aria-label="Visualización cartográfica">
+    <div class="map" leaflet [leafletOptions]="options" (leafletMapReady)="onMapReady($event)"></div>
+    <div class="legend" aria-label="Leyenda de profundidad y tamaño">
+      <strong>Leyenda de Profundidad:</strong>
+      <span class="legend-item"><span class="badge depth-shallow"></span> &lt; 70 km (Superficial)</span>
+      <span class="legend-item"><span class="badge depth-intermediate"></span> 70–299 km (Intermedio)</span>
+      <span class="legend-item"><span class="badge depth-deep"></span> ≥ 300 km (Profundo)</span>
+      <span class="legend-item"><span class="badge depth-unknown"></span> No disponible (ND)</span>
+      <p class="legend-note">El tamaño del círculo es visualmente proporcional a la magnitud sísmica.</p>
+    </div>
+  </section>
+
+  <!-- Métricas Generales y Comparativa Histórica (FAQ Q23) -->
+  @if (estadisticas()) {
+    <section class="metrics-section" aria-label="Resumen de sismicidad y comparación histórica">
+      <div class="metrics-grid">
+        <!-- Tarjeta de Resumen -->
+        <div class="card metric-card">
+          <h3>Resumen de la Selección</h3>
+          <div class="stats-summary">
+            <div class="stat-item">
+              <span class="stat-number">{{ estadisticas()!.total_eventos }}</span>
+              <span class="stat-desc">Sismos filtrados</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number">{{ estadisticas()!.resumen_metricas?.mag_media ?? 'ND' }}</span>
+              <span class="stat-desc">Magnitud media</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number">{{ estadisticas()!.resumen_metricas?.profundidad_media_km ?? 'ND' }} km</span>
+              <span class="stat-desc">Profundidad media</span>
+            </div>
+          </div>
+          <p class="stat-subtext">
+            Magnitudes observadas: Mín <b>{{ estadisticas()!.resumen_metricas?.mag_min ?? 'ND' }}</b> · 
+            Máx <b>{{ estadisticas()!.resumen_metricas?.mag_max ?? 'ND' }}</b> · 
+            Sin magnitud informada: <b>{{ estadisticas()!.resumen_metricas?.total_magnitud_nula ?? 0 }}</b>
+          </p>
+        </div>
+
+        <!-- Tarjeta de Comparativa Histórica 2025 vs 24h -->
+        <div class="card metric-card comparison-card">
+          <h3>Comparativa con Histórico 2025</h3>
+          @if (estadisticas()!.comparacion_historica; as comp) {
+            <div class="comparison-values">
+              <div class="comp-box">
+                <span class="comp-val">{{ comp.recuento_reciente_24h }}</span>
+                <span class="comp-lbl">Recuento últimas 24h</span>
+              </div>
+              <div class="comp-divider">vs</div>
+              <div class="comp-box">
+                <span class="comp-val">{{ comp.media_diaria_historica }}</span>
+                <span class="comp-lbl">Media diaria 2025</span>
+              </div>
+              <div class="comp-box comp-variation">
+                <span class="comp-val badge" [class.badge-higher]="comp.diferencia > 0" [class.badge-lower]="comp.diferencia <= 0">
+                  {{ comp.diferencia >= 0 ? '+' : '' }}{{ comp.variacion_porcentual }}%
+                </span>
+                <span class="comp-lbl">Variación</span>
+              </div>
+            </div>
+            <p class="comparison-explanation">
+              <strong>Conclusión:</strong> {{ comp.interpretacion }}
+            </p>
+            <small class="comparison-note">
+              Filtro base equivalente: Magnitud ≥ 4.0 en el mismo ámbito territorial durante los 365 días de 2025.
+            </small>
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- Gráficos de Distribución (Barras semánticas nativas accesibles) -->
+    <section class="charts-section" aria-label="Gráficos de distribución estadística">
+      <h2>Distribuciones y Ventanas Temporales</h2>
+      <div class="charts-grid">
+        <!-- Gráfico de Distribución por Magnitud -->
+        <div class="card chart-card">
+          <h3>Distribución por Magnitud</h3>
+          <div class="bar-chart">
+            @for (entry of estadisticas()!.distribucion_magnitud | keyvalue; track entry.key) {
+              <div class="chart-row">
+                <span class="row-label">{{ entry.key }}</span>
+                <div class="bar-container">
+                  <div class="bar bar-mag" [style.width.%]="getPercentage(entry.value, estadisticas()!.total_eventos)"></div>
+                </div>
+                <span class="row-value">{{ entry.value }} ({{ getPercentage(entry.value, estadisticas()!.total_eventos) }}%)</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Gráfico de Distribución por Profundidad -->
+        <div class="card chart-card">
+          <h3>Distribución por Profundidad</h3>
+          <div class="bar-chart">
+            @for (entry of estadisticas()!.distribucion_profundidad | keyvalue; track entry.key) {
+              <div class="chart-row">
+                <span class="row-label">{{ entry.key }}</span>
+                <div class="bar-container">
+                  <div class="bar bar-depth" [style.width.%]="getPercentage(entry.value, estadisticas()!.total_eventos)"></div>
+                </div>
+                <span class="row-value">{{ entry.value }} ({{ getPercentage(entry.value, estadisticas()!.total_eventos) }}%)</span>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Actividad por Ventana Fija de 1 Hora UTC -->
+      @if (estadisticas()!.por_ventana_hora.length > 0) {
+        <div class="card window-card">
+          <h3>Actividad por Ventana Fija de 1 Hora UTC</h3>
+          <p class="section-desc">Recuento de terremotos agrupados según el instante físico de ocurrencia (tiempo del evento UTC).</p>
+          <div class="hourly-timeline">
+            @for (w of estadisticas()!.por_ventana_hora; track w.timestamp) {
+              <div class="timeline-bar-col" [title]="w.hora_utc + ': ' + w.count + ' sismos'">
+                <span class="col-count">{{ w.count }}</span>
+                <div class="col-bar" [style.height.px]="Math.min(120, Math.max(12, w.count * 15))"></div>
+                <span class="col-label">{{ formatHour(w.hora_utc) }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </section>
+  }
+
+  <!-- Tabla Accesible de Eventos (Alternativa al Mapa y al Color) -->
+  <section class="table-section" aria-label="Tabla de datos accesibles">
+    <div class="table-header">
+      <h2>Listado de Terremotos (Tabla Accesible)</h2>
+      <p>Alternativa textual y accesible para usuarios con lectores de pantalla o navegación por teclado.</p>
+    </div>
+
+    @if (eventosList().length === 0) {
+      <p class="empty-state">No hay eventos para mostrar con los filtros seleccionados.</p>
+    } @else {
+      <div class="table-responsive">
+        <table class="earthquake-table" aria-label="Terremotos seleccionados">
+          <thead>
+            <tr>
+              <th scope="col">Fecha / Hora (UTC)</th>
+              <th scope="col">Magnitud</th>
+              <th scope="col">Profundidad</th>
+              <th scope="col">Ubicación / Descripción</th>
+              <th scope="col">País</th>
+              <th scope="col">Coordenadas</th>
+              <th scope="col">Identificador</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (ev of paginatedEvents(); track ev.id) {
+              <tr>
+                <td>{{ formatDate(ev.properties.time) }}</td>
+                <td>
+                  <strong>{{ ev.properties.mag !== null ? ev.properties.mag.toFixed(1) : 'ND' }}</strong>
+                  <small>{{ ev.properties.magType ?? '' }}</small>
+                </td>
+                <td>
+                  {{ ev.geometry.coordinates[2] !== undefined && ev.geometry.coordinates[2] !== null ? ev.geometry.coordinates[2] + ' km' : 'ND' }}
+                </td>
+                <td>{{ ev.properties.place ?? 'Sin descripción' }}</td>
+                <td>
+                  <span class="country-badge" [class.maritime]="!ev.properties.country_id">
+                    {{ ev.properties.country_name ?? 'Sin país asignado' }}
+                  </span>
+                </td>
+                <td>
+                  <code>{{ ev.geometry.coordinates[1].toFixed(3) }}°, {{ ev.geometry.coordinates[0].toFixed(3) }}°</code>
+                </td>
+                <td><code>{{ ev.id }}</code></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Controles de Paginación -->
+      <nav class="pagination" aria-label="Navegación de páginas de la tabla">
+        <button type="button" class="btn btn-sm" [disabled]="currentPage() === 1" (click)="prevPage()">← Anterior</button>
+        <span class="page-indicator">Página {{ currentPage() }} de {{ totalPages() }} ({{ eventosList().length }} terremotos)</span>
+        <button type="button" class="btn btn-sm" [disabled]="currentPage() >= totalPages()" (click)="nextPage()">Siguiente →</button>
+      </nav>
+    }
+  </section>
+
+  <!-- Pie de Página -->
+  <footer>
+    <div class="footer-content">
+      <p><strong>Observatorio de Actividad Sísmica</strong> · Proyecto de Big Data y Sistemas Distribuidos.</p>
+      <p class="footer-sources">Fuentes oficiales: Catálogo FDSNWS y Feed de USGS · Cartografía: Natural Earth 1:110m · Teselas: OpenStreetMap.</p>
+    </div>
+  </footer>
+</main>

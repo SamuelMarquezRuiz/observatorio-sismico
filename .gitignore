@@ -1,0 +1,30 @@
+# Secretos y credenciales locales
+.env
+*.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+venv/
+.venv/
+
+# Estado persistente local de SQLite
+backend/data/*.db
+backend/data/*.sqlite3
+
+# Descargas históricas pesadas regenerables
+datos/historico/*.geojson
+!datos/historico/registro_extraccion_2025.json
+
+# Node & Angular
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+
+# Docker y temporales
+*.log
+.DS_Store
+Thumbs.db

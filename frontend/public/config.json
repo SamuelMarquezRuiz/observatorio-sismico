@@ -1,0 +1,6 @@
+{
+  "mode": "api",
+  "apiUrl": "https://upturned-blast-tigress.ngrok-free.dev",
+  "refreshMs": 60000,
+  "skipNgrokWarning": true
+}
